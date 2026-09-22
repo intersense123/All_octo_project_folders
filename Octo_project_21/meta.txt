@@ -1,0 +1,103 @@
+===src_69==
+1)when click on prcigo logo 5 sec then password popup added. 
+2)successfully password update serial and model number functionality page visible to update about page.
+3)after save about page labels of serial and model update successfully.to check single click visible about page.
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+===src_70===
+1)update software functionality added.
+2)Error Popup should show when usb not detected,software version different,docker-compose.yml not found.etc.
+3)UserMangement user name or guest name will show on popup.after successful login.
+4)after logout fileds removed userlogin and userpassword .
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+===src_71===
+1)numpad hover added.
+2)replace clicked connect to pressed connect for every button save,home,back,forward.
+3)DimesnionFormulabar removed.
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+===src_72===
+1) Ui added for save master calibration on/Off radiobutton On IoSetting.
+2)Autosave functionality Enable and functions added for autosave working.
+3)setmaster value stored in dtabase i created database table SetMasterSettings there stores master value and all after restart no need to
+set master again tested successfully.
+4)also mastergrouping after calibration set master saves perfect. 
+5)savemasterdb on then only load data on ui else not
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+===src_73===
+1)Relay Individual and combine logic working perfect.as per cases.
+2)togglebutton add for savemastercalibration .removed radiobuttons for on/off on IOSettings. 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+===src_74===
+1)single master logic set testing done.
+2)factory calibration set successfully for single master.
+3)saveSingleMAster on db . so when restart application then no need to set master and calibrate again same as double master.
+4)button selects calibration added border colour .also update master grouping button border colour same like calibration.
+5)Autosense popup added for single master master type.
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+===src_75===
+1) Two channel spi ui set and loaded successfully.
+2) On button_mode spc,dial,digit changes successfully.
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+===src_76===
+1)All four channel spc,digit,dial ui set successfully loading propely.
+2)takes time to load spc .and probesetting save take time .
+
+===src_77===
+1)All four channel spc,digit,dial ui set successfully loading propely.
+2)takes time to load spc .and probesetting save take time .
+3)reset_graph and load saved data on graph after restart is done set properly.
+
+===src_78===
+1)probesaved time hanging issue solved for load_spc program.
+2)but after save spc update taking 30 to 40 sec to update spc points need to modification. 
+
+====src_79===
+1)dial needle rotation done using spring rotation slow .
+2)not linked with mastersettinghandler.
+
+===src_80====
+1) master setting handler dial needle rotation  linked speed of needle fast.(only one channel)
+2) background colour of ui change  grey to black 
+
+===src_81===
+1)one channel dial + needle rotation, as per status dial images changes green,red,yellow.
+2) least count remove for ticks calculation make it static 0.001. all works correct.fast.
+3) value if stable then only status shows eels not that changes happen here.
+
+==src_82_before_instanceclearOfDialHandler==
+1)it dosnt have safe instance recreation and and handle function calls safely for dial handler class.
+2) ui set for two channel perfectly and angle also but deleteion and updation instantly on ui remaining.
+
+===src_82_afterInstanceClerOfDialandUSedSafeInstnace===
+1)on Setvisibilty after channel changes previous instance gets clear and new instance generate as per channel.
+2)same for delete also.
+3)and on mastersetting handler safe instance function calls for colur change of dial and angle.
+
+===src_83===
+
+1)Four channel needle +dial +spc+ digit working functionality + ui visibility Done successfully.
+
+===src_84===
+
+1)spc_load fast.
+2)spc_update after save fast.
+
+
+
+===src_89===
+
+1)changes happen when proid change and dimension change then dial colur changes dosnt happen so did changes in master_setting_handler.py
+2)if proid change and and setmaster getting error firststep wrong becuse d1 d2 alredy store so it not removed so did changes in setmastercontroller.run for make it work.
+3)load spc dosnt happens instantly when programchange or progid change so did changes in on_limits_loaded for load data as per programs instantly no need for restart.
+
+
+===src_90==
+1)updated responsiveness instantly in worker thread did changes on master_setting handler.py

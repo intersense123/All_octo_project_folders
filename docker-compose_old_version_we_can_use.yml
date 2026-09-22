@@ -1,0 +1,77 @@
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    network_mode: host
+    restart: always
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /var/lib/tailscale:/var/lib/tailscale
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      
+  weston:
+    image: torizon/weston:4
+    restart: always
+    privileged: true
+    network_mode: host
+    ipc: host
+
+    environment:
+      - ENABLE_RDP=1
+
+    volumes:
+      - /tmp:/tmp
+      - /dev:/dev
+      - /run/udev:/run/udev
+      - /home/torizon/custom:/etc/xdg/weston-dev/
+      - /home/torizon/custom/Loading.png:/home/torizon/custom/Loading.png
+
+    cap_add:
+      - CAP_SYS_TTY_CONFIG
+
+    device_cgroup_rules:
+      - 'c 4:* rmw'
+      - 'c 13:* rmw'
+      - 'c 226:* rmw'
+      - 'c 10:223 rmw'
+
+  app:
+    image: intersense123/octo:1.2
+    privileged: true
+    restart: always
+    depends_on:
+      - weston
+    environment:
+      - QT_QPA_PLATFORM=wayland
+      - WAYLAND_DISPLAY=wayland-0
+      - XDG_RUNTIME_DIR=/tmp/1000-runtime-dir
+    volumes:
+      - /tmp:/tmp
+      - /dev:/dev
+      - /run/udev:/run/udev
+      - /var/rootdirs/media:/media:rshared
+      - /sys:/sys
+      - /etc/machine-id:/etc/machine-id:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/systemd:/var/run/systemd
+      - /usr/bin/systemctl:/usr/bin/systemctl:ro
+      - /run/dbus:/run/dbus
+      - /home/torizon/docker-compose.yml:/home/torizon/docker-compose.yml
+      - /home/torizon/Precigo:/home/torizon/app/data
+    devices:
+      - /dev/ttymxc0
+      - /dev/rtc0
+      - /dev/rtc1
+    cap_add:
+      - SYS_TIME
+      - NET_ADMIN
+      - SYS_BOOT
+    device_cgroup_rules:
+      - 'c 13:* rmw'
+    network_mode: host
+

@@ -1,0 +1,509 @@
+================================================================================
+SOURCE CODE FUNCTION INVENTORY
+spiModule/src/ Folder
+================================================================================
+
+This document lists all Python files in the src/ folder along with their 
+functions/classes and one-line descriptions.
+
+================================================================================
+FILE: active_ui_togglebutton_handler.py
+================================================================================
+Description: Functions for handling UI toggle button states and widget opacity
+
+Functions:
+- set_widget_opacity(widget, opacity)          - Set opacity of a widget with graphics effect
+- update_angle_toggle(win)                      - Updates angle calculation toggle image and widget states
+- update_rs232_toggle(win)                      - Updates RS232 toggle image and enables/disables widgets
+- update_autooffcet_toggle(win)                 - Updates Auto Offset toggle image and widget states
+- update_networkdatabase_toggle(win)            - Updates Network Database toggle image and widget states
+- update_IOSetting_Buzzer_toggle(win)          - Updates Buzzer IO setting toggle
+- update_IOSetting_Relay_toggle(win)            - Updates Relay IO setting toggle
+- update_IOSetting_CycleStopTimer_toggle(win)   - Updates Cycle Stop Timer toggle
+- update_IOSetting_AutosaveReading_toggle(win)  - Updates Auto Save Reading toggle
+- update_IOSetting_PartTraceability_toggle(win) - Updates Part Traceability toggle
+- update_IOSetting_TimetoMasterSet_toggle(win)  - Updates Time to Master Set toggle
+- update_IOSetting_MasterGrouping_toggle(win)   - Updates Master Grouping toggle
+
+
+================================================================================
+FILE: controller.py
+================================================================================
+Description: Main application controller handling SPI, Master logic, OK/NOT OK decisions
+
+Class: AppController
+Methods:
+- __init__(main_window, data_handler)         - Initialize controller with main window and data handler
+- handle_grouping_buttons()                     - Handle master grouping button clicks
+- get_selected_master_channels()               - Get selected master channels for grouping
+- init_progId_and_dimension()                  - Initialize program ID and dimension dropdowns
+- progId_changed_outer()                       - Handle outer program ID change
+- progId_changed_inner()                      - Handle inner program ID change
+- load_as_per_progId()                        - Load settings based on program ID
+- load_as_per_dimension(dimension)            - Load settings based on dimension selection
+- get_channels_for_program(program_id)          - Get available channels for a program
+- Handle_master_Grouping(program_id)            - Handle master grouping visibility
+- handle_set_datetime()                       - Set system date/time from UI
+- linkage_of_saveButton()                      - Link save button to appropriate save function
+
+
+================================================================================
+FILE: data_handler.py
+================================================================================
+Description: Data handler for database read/write operations and program settings
+
+Class: DataHandler
+Methods:
+- __init__(main_window, uiHandler)              - Initialize data handler
+- update_ui_after_programSettings_saved()      - Refresh UI after program settings saved
+- load_databases()                            - Load all database settings into dictionaries
+- load_data_to_ui()                           - Load all data to UI
+- load_ProgramSettings_to_ui()                - Load program settings to UI
+- load_ProbeBasedSettings_to_ui(dimension)     - Load probe-based settings for dimension
+- load_AOCBasedSettings_to_ui(dimension)      - Load AOC-based settings for dimension
+- load_IOSettings_to_ui()                    - Load IO settings to UI
+- load_IPSettings_to_ui()                     - Load IP settings to UI
+- load_WifiSettings_to_ui()                  - Load WiFi settings to UI
+- load_RS232Settings_to_ui()                 - Load RS232 settings to UI
+- load_NetworkedDatabaseSettings_to_ui()       - Load networked database settings to UI
+- load_AngleCalculationSettings_to_ui()       - Load angle calculation settings to UI
+
+Save Methods:
+- save_toDatabase_programSetting()            - Save program settings to database
+- save_toDatabase_probeBasedSettings()        - Save probe-based settings
+- save_toDatabase_aocBasedSettings()         - Save AOC-based settings
+- save_toDatabase_IOSettings()               - Save IO settings
+- save_toDatabase_IpSettings()              - Save IP settings
+- save_toDatabase_WifiSettings()             - Save WiFi settings
+- save_toDatabase_rs232Settings()            - Save RS232 settings
+- save_toDatabase_networkedDatabase_settings() - Save networked database settings
+- save_toDatabase_angleCalculationSettings()  - Save angle calculation settings
+- save_toDatabase_cncList()                  - Save CNC machine list
+- save_toDatabase_aocSettings()              - Save AOC settings
+- save_toDatabase_userManagement()           - Save user management data
+- save_toDatabase_shiftSettings()            - Save shift timing settings
+- handle_UserModify_clicked()                  - Handle user modify button click
+- handle_addUser_clicked()                    - Handle add user button click
+- clear_master_values_ui()                    - Clear master value labels
+- Hide_rows()                                 - Hide master value rows
+- load_Higher_lower_value_to_ui(program_id)   - Load master high/low values to UI
+- get_dimension_list_for_combobox()           - Get dimension list for combo box
+- update_dimension_combobox(keep_dimension)   - Update dimension combo box
+
+
+Class: DatabaseAgent
+Methods:
+- __init__()                                 - Initialize database connection
+- get_all_program_ids()                      - Get all program IDs from database
+- upsert_wifi_settings(ssid, password)       - Insert/update WiFi settings
+- upsert_ip_settings(ip, subnet, gateway)    - Insert/update IP settings
+- upsert_cnc_list(...)                       - Insert/update CNC machine list
+- upsert_angle_calculation_settings(...)      - Insert/update angle calculation settings
+- update_networked_database_settings(...)     - Update networked database settings
+- update_rs232_settings(...)                 - Update RS232 communication settings
+- update_io_settings(...)                    - Update IO settings
+- update_aoc_settings(...)                   - Update AOC settings
+- upsert_shift_timings(...)                 - Insert/update shift timings
+- upsert_user_management(...)                - Insert/update user credentials
+- upsert_program_settings(...)               - Insert/update program settings
+- upsert_probe_based_settings(...)            - Insert/update probe-based settings
+- upsert_aoc_based_settings(...)             - Insert/update AOC-based settings
+- load_data_to_WifiSettings_dict()           - Load WiFi settings to dictionary
+- load_data_to_RS232Settings_dict()          - Load RS232 settings to dictionary
+- load_data_to_NetworkedDatabaseSettings_dict() - Load networked DB settings
+- load_data_to_IPSettings_dict()             - Load IP settings to dictionary
+- load_data_to_ShiftTimings_dict()           - Load shift timings to dictionary
+- load_data_to_IOSettings_dict()             - Load IO settings to dictionary
+- load_data_to_AngleCalculationSettings_dict() - Load angle calc settings
+- load_data_to_AOCSettings_dict()            - Load AOC settings to dictionary
+- load_data_to_ProgramSettings_dict(program_id) - Load program settings
+
+
+================================================================================
+FILE: database.py
+================================================================================
+Description: (See data_handler.py - DatabaseAgent class)
+
+
+================================================================================
+FILE: dial_handler.py
+================================================================================
+Description: Dial handler for animated dial/needle display using Qt graphics
+
+Class: DialHandler
+Methods:
+- __init__(main_window, needle_pos_x, needle_pos_y, pivot_point_x, pivot_point_y, dial, needle, parent) - Initialize dial handler
+- update_dial(image_path)                    - Update dial image
+- update_needle(image_path)                  - Update needle image
+- _on_needle_angle_changed(angle)             - Slot to receive angle from signal
+- _update_needle_spring()                   - Update needle position using spring physics
+- move_needle(angle)                         - Move needle to specified angle
+- angle (property)                           - Get/set current angle
+- angle.setter                               - Set angle property
+
+
+================================================================================
+FILE: Dial_indicator.py
+================================================================================
+Description: Dial indicator UI handler and SPC (Statistical Process Control) chart manager
+
+Class: DialIndicator
+Methods:
+- __init__(main_window)                      - Initialize dial indicator
+- set_dimension_1_ui()                        - Set dimension 1 UI mode (Dial/SPC/Digit)
+- set_dimension_2_ui()                        - Set dimension 2 UI mode
+- set_dimension_3_ui()                        - Set dimension 3 UI mode
+- set_dimension_4_ui()                        - Set dimension 4 UI mode
+- set_visibility()                           - Set widget visibility based on channels
+
+
+Class: SPCBase
+Methods:
+- __init__(title, lsl, lcl, nominal, ucl, usl) - Initialize SPC base chart
+- scale_value(v)                             - Scale value for plotting
+- set_margins(left, right, top, bottom)      - Set chart margins
+- draw_background()                           - Draw colored background zones
+- draw_limit_lines()                          - Draw limit lines on chart
+- set_limits(lsl, lcl, nominal, ucl, usl)   - Set SPC limits
+- init_blank_ui()                            - Initialize blank chart
+- generate_graph(raw_data)                   - Generate graph with data
+- update_graph(value)                         - Update graph with new value
+
+
+Class: SPCWidget
+Methods:
+- __init__(spc, parent)                      - Initialize SPC widget
+- load_value(value)                          - Load value to SPC chart
+
+
+Class: SPCManager
+Methods:
+- __init__(main_window)                      - Initialize SPC manager
+- load_program_OnSpc(program_id)              - Load SPC limits for program
+- clear_layout(layout)                       - Clear layout
+- set_active_channels(channels)               - Set active SPC channels
+- apply_layout()                             - Apply SPC layout
+- update_value(channel, value)               - Update SPC chart value
+
+
+================================================================================
+FILE: factory_config.py
+================================================================================
+Description: Factory configuration dialog for selecting factory type
+
+Class: Ui_fact_config
+Methods:
+- setupUi(Dialog)                           - Setup factory config dialog UI
+- retranslateUi(Dialog)                     - Retranslate dialog strings
+
+Class: FactoryConfig (inherits QDialog)
+Methods:
+- __init__(parent, current_factory)         - Initialize factory config dialog
+- showEvent(event)                          - Handle dialog show event
+- save_factory_to_db(factory)                - Save factory config to database
+- load_factory_from_db()                    - Load factory config from database
+- on_ok_clicked()                           - Handle OK button click
+
+
+================================================================================
+FILE: formulabar.py
+================================================================================
+Description: Formula bar input dialog
+
+Class: Ui_Formulabar
+Methods:
+- __init__(target_lineedit, parent)          - Initialize formula bar
+- show_numpad()                             - Show numpad
+- push_buttonsubmit_clicked()               - Handle submit button click
+
+
+================================================================================
+FILE: letters_keypad.py
+================================================================================
+Description: Virtual keyboard for text input
+
+Class: Keyboard (inherits QWidget)
+Methods:
+- __init__(parent)                          - Initialize keyboard
+- showEvent(event)                          - Handle keyboard show event
+- create_keyboard()                         - Create keyboard layout
+- create_extra_buttons()                    - Create extra function buttons
+- commit_text()                             - Commit entered text
+- toggle_case()                             - Toggle uppercase/lowercase
+- toggle_symbols()                         - Toggle symbol keyboard
+
+
+================================================================================
+FILE: main.py
+================================================================================
+Description: Main application window entry point
+
+Class: MainWindow (inherits QMainWindow, Ui_MainWindow)
+Methods:
+- __init__()                                - Initialize main window
+- open_factory_config()                      - Open factory configuration dialog
+
+
+================================================================================
+FILE: master_Setting_handler.py
+================================================================================
+Description: SPI controller and master setting workflow management
+
+Class: Worker (inherits QObject)
+Methods:
+- __init__(factory_config, parent)          - Initialize SPI worker thread
+- run()                                      - Run SPI value emission loop
+- stop()                                     - Stop worker thread
+- cleanup()                                  - Cleanup SPI connections
+
+Class: Set_master_ui (inherits QDialog)
+Methods:
+- __init__(title_text, btn_text, parent, db_values, mode, selected_probes) - Initialize set master dialog
+- update_spi_value(v1, v2, v3, v4)         - Update SPI values display
+- _refresh_combined_display()               - Refresh combined SPI/DB display
+- center_on_parent()                         - Center dialog on parent
+
+Class: SetMasterController (inherits QObject)
+Methods:
+- __init__(parent, spi_values, spi_signal, grouped_channels) - Initialize master controller
+- get_probe_db_values(probe)                - Get probe database values
+- run()                                      - Run master setting workflow
+- calculate()                                - Calculate mm per raw SPI
+
+Class: SPIController (inherits QObject)
+Methods:
+- __init__(main_window, data_handler, app_controller) - Initialize SPI controller
+- refresh_settings()                        - Refresh stored settings
+- load_factory_from_db()                     - Load factory config from database
+- on_factory_changed(config)                 - Handle factory config change
+- spi_handler(v1, v2, v3, v4)               - Handle incoming SPI values
+- set_per_formula(a, b, c, d, formula_list) - Apply formula to values
+- get_formula_bar()                          - Get formula bar text
+- clean_spi_value(value)                    - Clean SPI value string
+- set_master()                              - Start master setting process
+- on_master_finished(probe_data, removed_parts) - Handle master setting completion
+- ok_notok_part_check()                     - Check OK/NOT OK status
+- Nomaster_label()                           - Handle no-master probe labels
+- combine_individual()                       - Handle combine/individual mode
+
+
+================================================================================
+FILE: messageBox.py
+================================================================================
+Description: Custom message dialog for user notifications
+
+Class: CustomMessageBox (inherits QDialog)
+Methods:
+- __init__(message, msg_type, parent)       - Initialize message box
+- center_on_parent()                         - Center dialog on parent
+- _accept()                                 - Handle accept/OK
+- _reject()                                 - Handle reject/cancel
+- exec_()                                   - Execute dialog
+
+
+================================================================================
+FILE: models.py
+================================================================================
+Description: SQLAlchemy ORM database models
+
+Database Models:
+- UserManagement                            - User login credentials and access types
+- CNCList                                   - CNC machine connection list
+- ShiftTimings                               - Working shift time configurations
+- IPSettings                                 - Network IP configuration
+- WifiSettings                               - WiFi connection settings
+- ProgramSettings                           - Program metadata and settings
+- NetworkedDatabaseSettings                  - Remote database connection
+- RS232Settings                              - Serial communication settings
+- AOCSettings                               - Auto Offset Compensation settings
+- AngleCalculationSettings                  - Angle calculation configuration
+- IOSettings                                - Input/Output settings
+- ProbeBasedSettings                         - Probe measurement configuration
+- AOCBasedSettings                          - AOC-based measurement settings
+- FactoryConfigSettings                     - Factory configuration
+- ActiveVariables                           - Active runtime variables
+
+
+================================================================================
+FILE: numpad.py
+================================================================================
+Description: Virtual numeric keypad for number input
+
+Class: Ui_Numpad
+Methods:
+- setupUi(Numpad, on_input)                - Setup numpad UI
+- close_numpad()                            - Close numpad
+- make_number_handler(char)                 - Create number button handler
+- pushButton_erase_clicked()                - Handle backspace click
+- retranslateUi(Numpad)                     - Retranslate numpad strings
+
+Class: numpad_window (inherits Ui_Numpad, QWidget)
+Methods:
+- __init__(target_lineedit, parent)         - Initialize numpad window
+- showEvent(event)                          - Handle show event
+- push_buttonsubmit_clicked()               - Handle OK button click
+
+
+================================================================================
+FILE: qt_key.py
+================================================================================
+Description: Empty/minimal testing file
+
+
+================================================================================
+FILE: spc_module.py
+================================================================================
+Description: SPC (Statistical Process Control) module - alternative implementation
+
+Class: Ui_SPCPage
+Methods:
+- setupUi(parent)                           - Setup SPC page UI
+
+
+================================================================================
+FILE: spi_module.py
+================================================================================
+Description: SPI hardware communication module for reading probe sensors
+
+Class: SPI
+Methods:
+- __init__(factory_config)                  - Initialize SPI communication
+- trigger_pulse()                          - Send trigger pulse to probes
+- spi_transfer(words)                       - Transfer data via SPI
+- to_signed_16(x)                           - Convert unsigned to signed 16-bit
+- spi_value_emitter()                       - Generator yielding probe values
+
+
+================================================================================
+FILE: ui_handler.py
+================================================================================
+Description: UI handler for visibility, styling, navigation, and keyboard management
+
+Class: UIHandler (inherits QObject)
+Methods:
+- __init__(main_window)                     - Initialize UI handler
+- open_part_settings()                      - Open part settings page
+- apply_ProbeBasedSettings_state()           - Apply probe settings UI state
+- apply_masterType_state()                  - Apply master type UI state
+- lineedit_opacity()                        - Set disabled line edit opacity
+- apply_line_styles(thickness, color)       - Apply line frame styles
+- linkage_of_ui()                           - Link UI elements to handlers
+- linkage_of_backButton()                   - Handle back button navigation
+- handle_aocwidget_backButton()             - Handle AOC widget back button
+- handle_aocwidget_forwardButton()          - Handle AOC widget forward button
+- linkage_of_forwardButton()                - Handle forward button navigation
+- toggle_button_eventHandling()             - Setup toggle button events
+- setup_lineedit_keyboards()                - Setup keyboard handlers for line edits
+- insert_formula_text(text)                 - Insert text into formula bar
+- linkage_formula_bar()                     - Link formula bar buttons
+- set_formula_source(source)                 - Set formula source type
+- handle_add_formula_click()                - Handle add formula button
+- save_formula_to_label()                   - Save formula to label
+- delete_last_character()                   - Delete last character from formula
+- apply_keyboard_text(lineedit, text, keyboard) - Apply keyboard input to field
+- on_numpad_closed()                       - Handle numpad close event
+- set_labels_to_header()                    - Set page labels in header
+- powerButton()                             - Setup power button menu
+- show_menu()                               - Show power menu
+- logout()                                  - Handle logout action
+- shutdown()                                - Handle shutdown action
+- restart()                                 - Handle restart action
+- handle_logout()                           - Execute logout
+- handle_shutdown()                         - Execute shutdown
+- handle_restart()                         - Execute restart
+- eventFilter(obj, event)                   - Event filter for widgets
+
+
+================================================================================
+FILE: User_manager.py
+================================================================================
+Description: UI visibility,Styling, Navigation,Keyboards,Power / menu actions
+
+Class: UserManager (inherits QObject)
+Methods:
+- __init__(main_window)                     - Initialize user manager
+- validate_user()                           - Validate username and password
+- check_access_level(user)                  - Check user access level
+- set_admin_access()                        - Set admin access UI
+- set_guest_access()                        - Set guest access UI
+
+
+Class: UserTableDisplay (inherits QObject)
+Methods:
+- __init__(main_window)                     - Initialize user table display
+- setup_table()                             - Setup table view columns
+- load_users_to_table()                     - Load users into table
+- delete_record()                           - Delete selected user record
+- delrow(row_index)                         - Delete row from table
+- refresh_table()                           - Refresh table data
+
+================================================================================
+FILE: utilities.py
+================================================================================
+Description: Utility functions for device settings, network, and system operations
+
+Class: Utilities
+Methods:
+- __init__(label_time, label_date, lineEdit_formulaBar) - Initialize utilities
+- validate_formulabar()                     - Validate formula bar input
+- is_raspberry_pi()                        - Check if running on Raspberry Pi
+- is_imx7()                                - Check if running on i.MX7
+- set_static_ip(ip_address, subnet_mask, gateway) - Set static IP on Raspberry Pi
+- set_static_ip_imx7(ip_addr, subnet_mask, gateway, iface) - Set static IP on i.MX7
+- apply_static_ip(ip, subnetmask, gateway)  - Apply static IP based on board type
+- update_display()                           - Update time/date display
+- set_system_time_raspberyPi()             - Set system time on Raspberry Pi
+- set_system_time_imx7()                   - Set system time on i.MX7
+- start_clock_updates()                      - Start clock update timer
+- Wifi_Settings(ssid, password)            - Configure WiFi connection
+- shutdown_device()                         - Shutdown the device
+- restart_device()                          - Restart the device
+
+
+Class: Value
+Methods:
+- __init__()                                - Initialize Value object
+- init_all_dictionaries()                   - Initialize all setting dictionaries
+- init_activeVariables_dictionary()         - Initialize active variables
+- init_mainProgramSettings_dictionary()      - Initialize program settings
+- init_CNCList_dictionary()                - Initialize CNC list
+- init_IOSettings_dictionary()             - Initialize IO settings
+- init_AngleCalculationSettings_dictionary() - Initialize angle calculation
+- init_IPSettings_dictionary()             - Initialize IP settings
+- init_NetworkedDatabaseSettings_dictionary() - Initialize networked DB settings
+- init_RS232Settings_dictionary()          - Initialize RS232 settings
+- init_ShiftTimings_dictionary()            - Initialize shift timings
+- init_UserManagment_dictionary()           - Initialize user management
+- init_WifiSettings_dictionary()            - Initialize WiFi settings
+- init_AOCsettings_dictionary()            - Initialize AOC settings
+
+
+
+================================================================================
+SUMMARY
+================================================================================
+Total Python Files: 23
+
+Key Application Components:
+- Main Entry Point: main.py (MainWindow)
+- UI Handlers: ui_handler.py, Dial_indicator.py
+- Data Management: data_handler.py, database.py
+- SPI Communication: spi_module.py, master_Setting_handler.py
+- Database Models: models.py
+- User Management: User_manager.py
+- Utilities: utilities.py, value.py
+- Input Keyboards: letters_keypad.py, numpad.py
+- Dialogs: messageBox.py, factory_config.py, formulabar.py
+
+Core Functionality:
+- SPI probe data acquisition and processing
+- Master calibration workflow
+- OK/NOT OK part determination
+- SPC (Statistical Process Control) charting
+- Database persistence for all settings
+- User access control
+- System settings (IP, WiFi, DateTime)
+- Multi-channel measurement support
+- Formula-based calculations
+================================================================================
+

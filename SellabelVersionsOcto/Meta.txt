@@ -1,0 +1,31 @@
+1)src_309_sankaj_1.0 and src_310_sankaj_1.0
+
+
+Basic functionality included
+- Relay out,serial out 
+- customized for digits shows on dial page only.
+- responsiveness ,probesensitivity.
+- mastergrouping.
+- footswitch 
+- save+footswitch signal green image
+- Hardcoded about page for serialno,modelno,versionno.
+- when program Id changed it may remain same constant even after save and restart application this happen here.
+
+2)src_1.3_metrolab
+
+needle of dial rotates fast
+dial,spc,digit,modes,added
+model,serial,not,hardcoded 2sec hold then password comes and then it should add.
+all functionality included 
+single master logic updated in this function.
+
+3)src_1.2_Azad_unit_2,src_1.2_Azad_unit_1
+
+- added features user cannot delete first admin crendentials.
+- saveamaster works perfect
+- probebasedsetting page numbering correct .
+- tempararliy acosetting,airsensitivityquotient,offset disable from ui.
+- modified worker thread to rotate needle fast.
+- when d1 set master done and savemasterindb is off then it remain stay in dict ,after d2 save then d2 added in dict.
+- spc ui modified successfully ,even when any mode we click save then ui getting structurized geometry properly.
+- userman_admin_password_reset_functions_done_shifitimingnumpadadded,button ui changes.set yellow boreder.

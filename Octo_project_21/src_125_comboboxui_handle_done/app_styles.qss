@@ -1,0 +1,115 @@
+QWidget {
+    background-color: black;
+    color: #ffffff;
+    font-family: "MS Shell Dlg 2";
+}
+QLabel{
+    font-size: 13pt;
+    min-height:35px;
+}
+QLineEdit{
+    font-size: 13pt;
+    min-height:33px;
+    border: 1px solid #888888;
+    border-radius: 1px;
+
+}
+QComboBox{
+    font-size: 13pt;
+    min-height:33px;
+    border: 1px solid #888888;
+    border-radius: 1px;
+
+}
+
+QComboBox QListView {
+    background-color: black;
+    color: white;
+    border: 1px solid #888888;
+    outline: 0;
+}
+
+QComboBox QListView::item {
+    background-color: black;
+    color: white;
+    padding: 4px;
+}
+
+QComboBox QListView::item:hover {
+    background-color: #666666;
+    color: white;
+}
+
+QComboBox QListView::item:selected {
+    background-color: #666666;
+    color: white;
+}
+/* All push buttons */
+QPushButton {
+    background-color: #444444;   /* grey background */
+    color: white;                /* text color */
+    font-size: 13pt;
+    border: 1px solid #888888;   /* grey border */
+    border-radius: 2px;
+}
+QPushButton:hover {
+    background-color: #666666;
+
+}
+QPushButton:pressed {
+    background-color: #222222;
+}
+QPushButton:released {
+    background-color: #222222;
+}
+QPushButton:clicked {
+    background-color: #222222;
+}
+
+QFrame[orientation="Horizontal"] {
+    background-color: #555555;
+     height: 2px;
+
+}
+
+QFrame[orientation="Vertical"] {
+    background-color: #555555;
+    width: 2px;
+ 
+}
+
+/* Radio buttons */
+QRadioButton {
+    font-size: 13pt;          /* text size */
+    color: #ffffff;           /* text color */
+    spacing: 5px;             /* space between circle and text */
+}
+
+/* Circle size */
+QRadioButton::indicator {
+    width: 20px;
+    height: 25px;
+    border-radius: 11px;
+    border: 2px solid #aaaaaa;
+    background-color: black;  /* outer circle background */
+}
+
+/* Unchecked circle */
+QRadioButton::indicator:unchecked {
+    background-color: black;
+}
+
+/* Checked circle: use radial gradient to simulate inner dot */
+QRadioButton::indicator:checked {
+    background-color: qradialgradient(
+        cx:0.5, cy:0.5, radius:0.5,
+        fx:0.5, fy:0.5,
+        stop:0 #fec222,       /* inner dot color */
+        stop:0.6 #2b2b2b      /* outer circle color */
+    );
+}
+QWidget:disabled {
+    color: #777777;
+    background-color: black;
+}
+

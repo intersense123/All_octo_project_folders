@@ -1,0 +1,11 @@
+[Unit]
+Description=Touch Calibration Monitor
+After=docker.service
+
+[Service]
+ExecStart=/home/torizon/Precigo/calibration_monitor.sh
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

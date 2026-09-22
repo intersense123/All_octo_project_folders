@@ -1,0 +1,50 @@
+services:
+  spimodule-debug:
+    build:
+      context: .
+      dockerfile: Dockerfile.debug
+    image: ${LOCAL_REGISTRY}:5002/spimodule-debug:${TAG}
+    privileged: true
+    environment:
+      - QT_QPA_PLATFORM=wayland
+      - XDG_RUNTIME_DIR=/tmp/1000-runtime-dir
+    volumes:
+      - /tmp:/tmp
+      - /tmp/1000-runtime-dir:/tmp/1000-runtime-dir
+      - /dev:/dev
+      - /media:/media
+      - /etc/machine-id:/etc/machine-id:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/systemd:/var/run/systemd
+      - /run/dbus:/run/dbus
+      - /run/udev:/run/udev
+      - /home/torizon/Precigo/precigo.db:/home/torizon/app/precigo.db
+    ports:
+      - ${DEBUG_SSH_PORT}:${DEBUG_SSH_PORT}
+      - ${DEBUG_PORT1}:${DEBUG_PORT1}
+    profiles:
+      - debug
+
+  spimodule:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${DOCKER_LOGIN}/spimodule:${TAG}
+    privileged: true
+    environment:
+      - QT_QPA_PLATFORM=wayland
+      - XDG_RUNTIME_DIR=/tmp/1000-runtime-dir
+    volumes:
+      - /tmp:/tmp
+      - /tmp/1000-runtime-dir:/tmp/1000-runtime-dir
+      - /dev:/dev
+      - /media:/media
+      - /etc/machine-id:/etc/machine-id:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/run/systemd:/var/run/systemd
+      - /run/dbus:/run/dbus
+      - /run/udev:/run/udev
+    profiles:
+      - release

@@ -1,0 +1,7 @@
+- [x] Import necessary modules: PyQt5, matplotlib, numpy, spc, spc_1
+- [x] Set up PyQt5 application and main window using Ui_MainWindow from spc
+- [x] For widget: Create canvas, SPCPlot, generate 50 random values, generate graph, embed
+- [x] For widget_2: Create canvas, SPCPlot, generate 50 random values, generate graph, embed
+- [x] For widget_3: Create canvas, SPCPlot, generate 50 random values, generate graph, embed
+- [x] For widget_4: Create canvas, SPCPlot, generate 50 random values, generate graph, embed
+- [x] Show the main window and run the app

@@ -1,0 +1,561 @@
+PRECiGO / spiModule - PROJECT WORKING STRUCTURE
+================================================
+
+Purpose
+-------
+This is a map of the complete current src/ directory. It is intended to be
+read first when changing the application. It lists every source file and asset
+present when this document was made, including generated, test, legacy, and
+resource files. A filename is not omitted merely because it is not imported by
+the main application today.
+
+The live desktop application starts at:
+
+    src/main.py
+
+It is a PySide2 full-screen measurement application for four dimensions
+(D1-D4). It reads SPI probes, evaluates formulas, applies master calibration,
+displays dial/SPC results, saves measurements, and can send serial, GPIO relay,
+and CNC/AOC output.
+
+
+1. TOP-LEVEL RUNTIME MAP
+------------------------
+
+                         +----------------------+
+                         | src/main.py          |
+                         | MainWindow            |
+                         +----------+-----------+
+                                    |
+             +----------------------+-------------------------+
+             |                      |                         |
+             v                      v                         v
+    +----------------+    +--------------------+    +---------------------+
+    | Qt UI          |    | Program/settings   |    | Measurement runtime |
+    | main_ui_18.py  |    | data_handler.py    |    | master_Setting_...  |
+    | ui_handler.py  |    | controller.py      |    | spi_module.py       |
+    +----------------+    | database.py        |    +----------+----------+
+                          | models.py          |               |
+                          | value.py           |               v
+                          +--------------------+    +---------------------+
+                                                    | Dial/SPC display    |
+                                                    | Dial_indicator.py   |
+                                                    | dial_handler.py     |
+                                                    +---------------------+
+
+             +----------------------+-------------------------+
+             |                      |                         |
+             v                      v                         v
+    +----------------+    +--------------------+    +---------------------+
+    | Local records  |    | Machine/AOC         |    | Device integration  |
+    | SaveModels.py  |    | cnc_machine_...     |    | GPIO / relay /      |
+    | ProbeValues    |    | FanucLibDefs.py     |    | RS232 / utilities   |
+    | AOCValues      |    | aoc_csv_exporter.py |    |                     |
+    +----------------+    +---------------------+    +---------------------+
+
+
+2. APPLICATION STARTUP FLOW
+---------------------------
+
+    Python starts main.py
+        |
+        v
+    QApplication + MainWindow are created
+        |
+        +--> main_ui_18.Ui_MainWindow.setupUi() builds widgets/pages
+        +--> Value loads in-memory dictionaries from the settings database
+        +--> SaveDatabaseManager opens the measurement-history database
+        +--> DatabaseAgent and DataHandler load program and settings data
+        +--> AppController selects active program/dimensions
+        +--> DialIndicator and SPCManager prepare the display
+        +--> SPIController starts the SPI Worker thread if a factory exists
+        +--> CNCManager, user tables, GPIO footswitch, serial and relay are set up
+        |
+        v
+    MainWindow is displayed full screen
+
+Important construction order in main.py:
+
+    Value -> SaveDatabaseManager -> DatabaseAgent -> RelayController
+          -> UIHandler -> DataHandler -> AppController -> SPCManager
+          -> DialIndicator -> SPIController -> CNCManager
+
+The MainWindow owns these objects. Other modules receive the window reference
+when they need widgets, current settings, or shared controllers.
+
+
+3. LIVE MEASUREMENT FLOW
+------------------------
+
+    Hardware probes
+        |
+        v
+    spi_module.SPI
+        - GPIO trigger pulse
+        - SPI transactions for four probe channels
+        - averaging using Responsiveness
+        - probe-sensitivity dead band
+        |
+        v
+    master_Setting_handler.Worker (QThread)
+        - turns samples into a list
+        - throttles GUI updates to roughly 60 Hz
+        |
+        v
+    SPIController.spi_handler(values)
+        - maps raw samples to D1-D4
+        - preserves raw_spi_values
+        - evaluates configured Formula values
+        - updates live labels
+        - calls ok_notok_part_check()
+        |
+        +--> Master conversion and tolerance/status calculation
+        +--> Dial animation and colour
+        +--> No Master status calculation
+        +--> Autosense check
+        +--> optional relay output / autosave / manual save
+        +--> SPC and AOC/CNC paths where enabled
+
+
+4. FORMULA AND MASTER FLOW
+--------------------------
+
+Formula sources are stored in ProbeBasedSettings.Formula. Typical inputs use
+P1-P4 as physical inputs and may reference D1-D4 as calculated dimensions.
+
+    physical probe raw values
+        |
+        v
+    formula resolution (resolve_formulas + set_per_formula)
+        |
+        v
+    calculated SPI value for D1-D4
+        |
+        v
+    master conversion in SPIController.ok_notok_part_check()
+        |
+        v
+    final formula calculation from master-converted values
+        |
+        v
+    least-count rounding -> label, dial, status, save/AOC
+
+Master types:
+
+  * Double Master
+      Uses lower and higher master SPI readings plus MasterLower/MasterHigher
+      database values to calculate the conversion factor.
+
+  * Single Master
+      Uses a previously captured low/high factory calibration for the physical
+      probe plus the current single master position. SingleMasterCalibration
+      stores the physical-probe calibration values and conversion factor.
+
+  * No Master
+      Does not have a direct master conversion. It can still have limits and a
+      formula. Example: D1 can be Single Master and D4 can be No Master with
+      formula D4 -> D1. When D1 master setup succeeds,
+      register_no_master_dimensions() adds D4 to probe_data and
+      no_master_limits before master_finished is emitted. Therefore D4 can
+      display the calculated D1 result immediately.
+
+Single-master setup sequence:
+
+    Set Master button
+        -> SetMasterController
+        -> remove-part dialog
+        -> set-master dialog
+        -> capture current master SPI
+        -> calculate_single_master(D1 row)
+        -> register_no_master_dimensions()       [D4 and other No Master rows]
+        -> master_finished signal
+        -> SPIController.on_master_finished()
+        -> continuous value/status display
+
+
+5. DATA AND DATABASE MAP
+------------------------
+
+There are two SQLAlchemy database areas:
+
+  A. Configuration database: models.py
+     Path: /home/torizon/app/data/precigo.db
+     Used by DatabaseAgent, DataHandler, SPIController, CNCManager, etc.
+
+     Main tables/models:
+       UserManagement                 user credentials/access
+       CNCMaster                      configured machine connections
+       ShiftTimings                   production shifts
+       IPSettings / WifiSettings      network settings
+       ProgramSettings                program name, mode, UOM, responsiveness
+       NetworkedDatabaseSettings      remote database settings
+       RS232Settings                  serial configuration
+       AOCSettings                    AOC feature settings
+       AngleCalculationSettings       angle feature configuration
+       IOSettings                     relay, autosave, grouping, save master...
+       ProbeBasedSettings             dimension/formula/master/tolerance settings
+       AOCBasedSettings               offset-control settings by dimension
+       FactoryConfigSettings          hardware factory A-E setting
+       SetMasterSettings              saved program master readings
+       SingleMasterCalibration        per-physical-probe single-master calibration
+       ActiveVariables                active program and feature-state values
+
+  B. Measurement-history database: SaveModels.py
+     Path: /home/torizon/app/data/OctoPreciGo.db
+
+     Runtime tables:
+       ProbeBasedIds / AOCBasedIds    unique setting identities
+       ProbeValues                    saved gauge readings and OK status
+       SPCResetTracker                SPC reset positions
+       AOCValues                      automatic offset-control history
+
+DataHandler saves configuration. SaveDatabaseManager saves measurement and AOC
+history. Do not confuse the two databases when debugging missing data.
+
+
+6. USER-INTERACTION AND FEATURE FLOWS
+-------------------------------------
+
+Program/settings editing:
+
+    UIHandler handles widget behaviour, keypads, pages and formula editing
+        -> DataHandler validates/saves UI settings
+        -> DatabaseAgent writes configuration models
+        -> Value/DataHandler refresh in-memory dictionaries
+        -> AppController reloads the active program/dimensions
+        -> SPIController/DialIndicator refresh their caches
+
+Save reading:
+
+    Save button or GPIO footswitch
+        -> SPIController.save_probe_values()
+        -> SaveDatabaseManager.insert_probe_values()
+        -> optional SPC graph update
+        -> optional serial output
+        -> optional CNCManager.on_probe_value_saved()
+
+CNC/AOC:
+
+    saved probe value
+        -> CNCManager checks AOC and selected machine/dimension
+        -> reads current Fanuc offset
+        -> chooses correction subject to limits/work-in-process/skip rules
+        -> writes offset using FANUCDEFS
+        -> stores AOC history in SaveDatabaseManager
+        -> can export history using AOCExport
+
+Status output:
+
+    calculated result -> OK / REWORK / NOT OK
+        -> label and dial colour
+        -> RelayController GPIO output when relay enabled
+        -> serial message when RS232 enabled
+
+
+7. COMPLETE PYTHON FILE INVENTORY
+---------------------------------
+
+The descriptions below distinguish current main-path files from supporting,
+generated, test, or legacy files. All are present under src/.
+
+  src/main.py
+      Live entry point. Creates QApplication/MainWindow and composes the
+      controllers, UI, database, hardware and CNC objects.
+
+  src/main_ui_18.py
+      Current generated PySide2 Qt Designer UI class (Ui_MainWindow). Imported
+      by main.py; contains widget/page construction and Qt resource references.
+
+  src/main_old.py
+      Older generated PySide6 UI version. It is not imported by main.py, but is
+      retained as a historical UI source.
+
+  src/master_Setting_handler.py
+      Core live SPI/master controller. Contains Worker, Set_master_ui,
+      SetMasterController and SPIController. Handles raw acquisition updates,
+      formulas, single/double/no master setup, result/status calculation,
+      autosense, least count, autosave, persistence and dial/relay integration.
+
+  src/spi_module.py
+      Low-level SPI/GPIO probe driver. Opens /dev/spidev2.0, controls its trigger
+      GPIO, reads four channels, applies averaging and probe sensitivity.
+
+  src/Dial_indicator.py
+      Current dial and SPC implementation used by main.py. Contains DialIndicator
+      plus SPCBase, SPCWidget, SPCManager and a background SPC loader worker.
+
+  src/dial_handler.py
+      Single dial needle renderer/animator. Uses dial background and SVG needle
+      resources, tracks angle and sets dial colour/range.
+
+  src/spc_module.py
+      Separate/older SPC UI implementation with SPCBase, SPCWidget and
+      SPCManager. It is retained but main.py imports SPCManager from
+      Dial_indicator.py.
+
+  src/controller.py
+      AppController. Coordinates program/dimension selection, program loading
+      and deletion, master-group selection, UI navigation and active channels.
+
+  src/data_handler.py
+      DataHandler. Loads database records into UI/dictionaries; saves program,
+      probe, AOC, IO, network, serial, CNC, user and shift settings; emits
+      signals for refreshes and clears master-display rows.
+
+  src/database.py
+      DatabaseAgent. SQLAlchemy CRUD/upsert operations for configuration data.
+
+  src/models.py
+      SQLAlchemy model definitions and configuration-database bootstrap/default
+      records. Exposes SessionLocal for the precigo.db database.
+
+  src/SaveModels.py
+      SaveDatabaseManager and the separate measurement-history schema:
+      ProbeValues, SPC reset tracking and AOC values.
+
+  src/value.py
+      Value. Central in-memory dictionaries for active program and all settings.
+      Reads current settings from models.SessionLocal.
+
+  src/ui_handler.py
+      UIHandler and PasswordKeypad/ShutdownMenu. Connects widgets and pages,
+      applies master/AOC control state, manages keypads/numpads, formula editing,
+      headers, hidden login and shutdown/restart/logout UI.
+
+  src/active_ui_togglebutton_handler.py
+      Small UI-state helpers for enabling/disabling/tinting settings widgets and
+      updating angle, RS232, AOC, network database and IO toggle button visuals.
+
+  src/numpad.py
+      Numeric touch keypad, including a TouchOverlay for input focus.
+
+  src/letters_keypad.py
+      Alphabetic/symbol touch keyboard for line-edit text input.
+
+  src/formulabar.py
+      Formula-bar keypad wrapper that inserts submitted formula text into a
+      target input field.
+
+  src/messageBox.py
+      CustomMessageBox modal dialog for info, success, warning and error states.
+
+  src/statusBarmanager.py
+      PageStatusManager. Shows and clears page-scoped status-bar messages.
+
+  src/factory_config.py
+      Factory configuration dialog. Stores/loads factory A-E selection and emits
+      config_changed so SPIController can restart the SPI worker correctly.
+
+  src/IO_Settings_Handler.py
+      RelayController. Owns three GPIO output lines (green, red and yellow) and
+      runs interruptible timed relay/indicator output in a background thread.
+
+  src/gpio_input_handler.py
+      GpioInputHandler QThread. Watches the footswitch GPIO input and triggers
+      manual saving on the dial page unless automatic save is enabled.
+
+  src/serial_handler.py
+      SerialHandler. Opens/configures an RS232 port and writes measurement text.
+
+  src/utilities.py
+      Device utilities: formula validation, Raspberry Pi/i.MX7 detection, static
+      IP/Wi-Fi setup, device clock updates, shutdown and restart helpers.
+
+  src/User_manager.py
+      UserManager login/access control plus UserTableDisplay CRUD UI.
+
+  src/cnc_machine_Handler.py
+      CNCManager, AOCWorker, connection monitor and connection-status dialog.
+      Manages machine setup, Fanuc communication, automated correction, AOC
+      history, connection monitoring and report export.
+
+  src/FanucLibDefs.py
+      ctypes/socket Fanuc library wrapper. Connects to Fanuc, reads/writes
+      offsets and handles machine connection lifecycle.
+
+  src/cnc_Listmanager.py
+      CNC list/settings table UI (CncListDisplay) and AOC history table UI
+      (AocHistoryDisplay).
+
+  src/aoc_csv_exporter.py
+      AOCExport. Exports AOC history to CSV or XLSX, including USB-path support.
+
+  src/Calender_dialog.py
+      AOCDateCalendar custom Qt calendar dialog used to select AOC report dates.
+
+  src/help.py
+      AboutPageHandler. Stores/loads device serial number and runs software
+      update-from-USB support.
+
+  src/resources.qrc
+      Qt resource manifest for assets compiled into resources_rc.py.
+
+  src/resources_rc.py
+      Generated Python Qt resource module. Imported by main.py and main_ui_18.py.
+      Regenerate it from resources.qrc if the resource manifest changes.
+
+  src/qt_key.py
+      Small standalone Qt line-edit/key handling example/helper. It is not on
+      main.py's import path.
+
+  src/csv_exporter_not_used.py
+      Legacy direct SQLite CSV exporter. Its filename indicates it is not the
+      current AOC exporter; the current implementation is aoc_csv_exporter.py.
+
+  src/test_1.py
+      Large alternative/test snapshot of the SPI/master/dial implementation.
+      It is not imported by main.py. Use it only as a reference or test source;
+      the live code is master_Setting_handler.py.
+
+
+8. COMPLETE NON-PYTHON FILE INVENTORY
+-------------------------------------
+
+All remaining files under src/ are listed here. The images are UI assets. Some
+are loaded by Qt resources and some by absolute/relative file paths. Do not
+rename or remove an asset without first searching for its use in .py and .qrc.
+
+  src/resources.qrc
+  src/images/Back_Yellow.png
+  src/images/Background_1980_1080.jpg
+  src/images/Buzzer.png
+  src/images/Cancel_Black.png
+  src/images/Cancel_Yellow.png
+  src/images/Clock_setting.png
+  src/images/Clock_setting.png.png
+  src/images/Deselected_Home.png
+  src/images/Dial Indicator.png
+  src/images/Dial_Indicator.png
+  src/images/Footer_1980.png
+  src/images/Header_1980.png
+  src/images/Home_Icon.png
+  src/images/Home_Icon_Yellow.png
+  src/images/Line_Chart_Black.png
+  src/images/Line_Chart_Yellow.png
+  src/images/Needle-circle-white-110-svg.svg
+  src/images/Needle-circle-white-120-svg.svg
+  src/images/Needle-circle-white-90-svg.svg
+  src/images/Needle-circle-white-svg.svg
+  src/images/Needle-white-svg.svg
+  src/images/Radio_Btn_Deselected.png
+  src/images/Radio_Btn_Deselected_Disabled.png
+  src/images/Radio_Btn_Deselected_Disabled.png:Zone.Identifier
+  src/images/Radio_Btn_Selected1.png
+  src/images/Radio_Btn_Selected1_Disabled.png
+  src/images/Radio_Btn_Selected1_Disabled.png:Zone.Identifier
+  src/images/Report.png
+  src/images/Report_Icon_Yellow.png
+  src/images/Save_Icon_Black.png
+  src/images/Save_Icon_Yellow.png
+  src/images/Selected_Home.png
+  src/images/Switcher_OFF.png
+  src/images/Switcher_On.png
+  src/images/Title Bar.png
+  src/images/autooffset.png
+  src/images/background.jpg
+  src/images/background.png
+  src/images/button_back.png
+  src/images/calender_icon.png
+  src/images/clicked_back.png
+  src/images/clock icon.png
+  src/images/clock.png
+  src/images/clock_updated.png
+  src/images/close_icon.png
+  src/images/dial-30-green-260.png
+  src/images/dial-30-green-300.png
+  src/images/dial-30-green-380.png
+  src/images/dial-30-red-260.png
+  src/images/dial-30-red-300.png
+  src/images/dial-30-red-380.png
+  src/images/dial-30-yellow-260.png
+  src/images/dial-30-yellow-300.png
+  src/images/dial-30-yellow-380.png
+  src/images/dial-60-green-260.png
+  src/images/dial-60-green-300.png
+  src/images/dial-60-green-380.png
+  src/images/dial-60-red-260.png
+  src/images/dial-60-red-300.png
+  src/images/dial-60-red-380.png
+  src/images/dial-60-yellow-260.png
+  src/images/dial-60-yellow-300.png
+  src/images/dial-60-yellow-380.png
+  src/images/divider_Yellow.png
+  src/images/error-1.png
+  src/images/error-15.png
+  src/images/error-40.png
+  src/images/error.png
+  src/images/footer.png
+  src/images/forward_Yellow.png
+  src/images/forward_yelo.png
+  src/images/green35.png
+  src/images/header.png
+  src/images/headerNew.png
+  src/images/help.png
+  src/images/help130.png
+  src/images/history_yellow.png
+  src/images/indicator.png
+  src/images/info-1.png
+  src/images/info-15.png
+  src/images/info-40.png
+  src/images/io setting.png
+  src/images/needle_big.png
+  src/images/offset-image-icon_2.png
+  src/images/pop-up_background.jpg
+  src/images/power-button.png
+  src/images/preciGO.png
+  src/images/settings.png
+  src/images/some.png
+  src/images/success-1.png
+  src/images/success-15.png
+  src/images/success-40.png
+  src/images/toggle_on.png
+  src/images/user-management_12.png
+  src/images/warning.png
+  src/images/warning_15.png
+  src/images/warning_40.png
+
+
+9. QUICK "WHERE DO I CHANGE THIS?" GUIDE
+------------------------------------------
+
+  Need to change...                         Start with...
+  ----------------------------------------  ----------------------------------
+  Application startup / objects              main.py
+  Widget placement / page widgets            main_ui_18.py
+  Widget actions / navigation / keypad       ui_handler.py
+  Program or dimension selection             controller.py
+  Settings load/save                         data_handler.py, database.py
+  Settings table/schema                      models.py
+  Current program values in memory           value.py
+  SPI acquisition / live results             spi_module.py, master_Setting_handler.py
+  Master setup or No Master formula result   master_Setting_handler.py
+  Dial needle / dial layouts                 Dial_indicator.py, dial_handler.py
+  SPC chart                                  Dial_indicator.py, SaveModels.py
+  Saved reading/history                      master_Setting_handler.py, SaveModels.py
+  Relay / status GPIO                        IO_Settings_Handler.py
+  Footswitch                                 gpio_input_handler.py
+  RS232                                      serial_handler.py
+  CNC/AOC correction                         cnc_machine_Handler.py, FanucLibDefs.py
+  AOC reports                                aoc_csv_exporter.py, Calender_dialog.py
+  User access                                User_manager.py
+  Factory/probe hardware mode                factory_config.py, spi_module.py
+  Image/resource registration                resources.qrc, resources_rc.py, images/
+
+
+10. SAFE CHANGE CHECKLIST
+------------------------
+
+  1. Start from main.py to identify the live import path.
+  2. Search for a class/method name before changing it: rg -n "Name" src.
+  3. For a new setting, update all four layers where applicable:
+       models.py -> database.py -> data_handler.py -> value.py/UI handling.
+  4. For a master/formula change, test all three master types and formulas that
+     depend on another dimension (for example D4 -> D1).
+  5. For GPIO/SPI/Fanuc/serial code, test on the target hardware; those modules
+     access real device paths and communication libraries.
+  6. For a new image resource, add it to resources.qrc and regenerate
+     resources_rc.py if it is to be used as a Qt resource.
+  7. Keep main_old.py, test_1.py, spc_module.py and csv_exporter_not_used.py
+     separate from the live path unless you intentionally migrate code from them.
+
+End of project map.

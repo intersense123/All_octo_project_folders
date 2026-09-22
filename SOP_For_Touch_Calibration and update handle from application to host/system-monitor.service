@@ -1,0 +1,14 @@
+[Unit]
+Description=Precigo System Monitor
+After=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/torizon
+ExecStart=/bin/bash /home/torizon/Precigo/system_monitor.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

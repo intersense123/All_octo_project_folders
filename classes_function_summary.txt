@@ -1,0 +1,625 @@
+Source class and function summary for src folder
+Generated from files under src/
+
+# ###File: Dial_indicator.py
+# Class: SPCLoaderWorker - Runs background processing in a thread.
+# Method: SPCLoaderWorker.__init__ - Performs a specific task for the module.
+# Method: SPCLoaderWorker.run - Executes the main workflow or task.
+# Method: SPCLoaderWorker.stop - Performs a specific task for the module.
+
+# Class: SPCBase - Defines a reusable component or model.
+# Method: SPCBase.__init__ - Performs a specific task for the module.
+# Method: SPCBase.set_title - Sets or updates a state, value, or property.
+# Method: SPCBase.cache_background - Performs a specific task for the module.
+# Method: SPCBase.build_static_axes - Performs a specific task for the module.
+# Method: SPCBase.build_limit_artists - Performs a specific task for the module.
+# Method: SPCBase.update_limit_artists - Refreshes values, UI states, or related data.
+# Method: SPCBase.dynamic_xticks - Performs a specific task for the module.
+# Method: SPCBase.set_limits - Sets or updates a state, value, or property.
+# Method: SPCBase.reset_graph - Performs a specific task for the module.
+# Method: SPCBase.clamp_value - Performs a specific task for the module.
+# Method: SPCBase.update_graph - Refreshes values, UI states, or related data.
+# Method: SPCBase.generate_graph - Performs a specific task for the module.
+# Method: SPCBase.set_margins - Sets or updates a state, value, or property.
+# Method: SPCBase.__del__ - Performs a specific task for the module.
+
+# Class: SPCWidget - Defines a reusable component or model.
+# Method: SPCWidget.__init__ - Performs a specific task for the module.
+# Method: SPCWidget.load_value - Loads data or configuration into memory.
+# Method: SPCWidget.reset - Performs a specific task for the module.
+# Method: SPCWidget.resizeEvent - Performs a specific task for the module.
+
+# Class: SPCManager - Coordinates related objects, state, or workflow.
+# Method: SPCManager.__init__ - Performs a specific task for the module.
+# Method: SPCManager.ensure_layout - Performs a specific task for the module.
+# Method: SPCManager.clear_layout - Performs a specific task for the module.
+# Method: SPCManager.load_spc - Loads data or configuration into memory.
+# Method: SPCManager.load_program_OnSpc - Loads data or configuration into memory.
+# Method: SPCManager.start_loader_thread - Performs a specific task for the module.
+# Method: SPCManager.run_pending_if_any - Executes the main workflow or task.
+# Method: SPCManager.on_limits_loaded - Performs a specific task for the module.
+# Method: SPCManager.load_data - Loads data or configuration into memory.
+# Method: SPCManager.reset_all_spc - Performs a specific task for the module.
+# Method: SPCManager.set_active_channels - Sets or updates a state, value, or property.
+# Method: SPCManager.apply_layout - Performs a specific task for the module.
+# Method: SPCManager.apply_markersize - Performs a specific task for the module.
+# Method: SPCManager.update_value - Refreshes values, UI states, or related data.
+
+# Class: DialIndicator - Displays live measurement or status indicators.
+# Method: DialIndicator.__init__ - Performs a specific task for the module.
+# Method: DialIndicator.toggle_mode - Performs a specific task for the module.
+# Method: DialIndicator.apply_spc_geometry - Performs a specific task for the module.
+# Method: DialIndicator.set_dimension_1_ui - Sets or updates a state, value, or property.
+# Method: DialIndicator.set_dimension_2_ui - Sets or updates a state, value, or property.
+# Method: DialIndicator.set_dimension_3_ui - Sets or updates a state, value, or property.
+# Method: DialIndicator.set_dimension_4_ui - Sets or updates a state, value, or property.
+# Method: DialIndicator.update_single_dial - Refreshes values, UI states, or related data.
+# Method: DialIndicator.destroy_dial_handlers - Performs a specific task for the module.
+# Method: DialIndicator.get_font_size - Returns a requested value or object.
+# Method: DialIndicator.set_visibility - Sets or updates a state, value, or property.
+
+# ###File: IO_Settings_Handler.py
+# Class: RelayController - Coordinates application workflow and UI/data interaction.
+# Method: RelayController.__init__ - Performs a specific task for the module.
+# Method: RelayController._init_gpio - Performs a specific task for the module.
+# Method: RelayController.set_led - Sets or updates a state, value, or property.
+# Method: RelayController.turn_all_off - Performs a specific task for the module.
+# Method: RelayController.trigger - Performs a specific task for the module.
+# Method: RelayController._run - Performs a specific task for the module.
+# Method: RelayController.cleanup - Releases resources or shuts down state.
+
+# ###File: SaveModels.py
+# Class: SaveDatabaseManager - Coordinates related objects, state, or workflow.
+# Method: SaveDatabaseManager.__init__ - Performs a specific task for the module.
+# Method: SaveDatabaseManager.connect - Wires signals, slots, or related components together.
+# Method: SaveDatabaseManager.create_tables - Builds or instantiates a UI object.
+# Method: SaveDatabaseManager.disconnect - Performs a specific task for the module.
+# Method: SaveDatabaseManager.get_session - Returns a requested value or object.
+# Method: SaveDatabaseManager.insert_probe_based_ids - Performs a specific task for the module.
+# Method: SaveDatabaseManager.insert_probe_values - Performs a specific task for the module.
+# Method: SaveDatabaseManager.get_probe_values_for_spc - Returns a requested value or object.
+# Method: SaveDatabaseManager.reset_spc_for_probe - Performs a specific task for the module.
+# Method: SaveDatabaseManager.get_latest_global_counter - Returns a requested value or object.
+# Method: SaveDatabaseManager.get_next_global_counter - Returns a requested value or object.
+# Method: SaveDatabaseManager.get_job_counts - Returns a requested value or object.
+# Method: SaveDatabaseManager.get_probe_id_by_settings - Returns a requested value or object.
+
+# ###File: User_manager.py
+# Class: UserManager - Coordinates related objects, state, or workflow.
+# Method: UserManager.__init__ - Performs a specific task for the module.
+# Method: UserManager.validate_user - Validates a condition or input.
+# Method: UserManager.check_access_level - Validates a condition or input.
+# Method: UserManager.set_admin_access - Sets or updates a state, value, or property.
+# Method: UserManager.set_guest_access - Sets or updates a state, value, or property.
+
+# Class: UserTableDisplay - Defines a reusable component or model.
+# Method: UserTableDisplay.__init__ - Performs a specific task for the module.
+# Method: UserTableDisplay.setup_table - Sets or updates a state, value, or property.
+# Method: UserTableDisplay.load_users_to_table - Loads data or configuration into memory.
+# Method: UserTableDisplay.delete_record - Performs a specific task for the module.
+# Method: UserTableDisplay.delrow - Performs a specific task for the module.
+# Method: UserTableDisplay.refresh_table - Performs a specific task for the module.
+
+# ###File: active_ui_togglebutton_handler.py
+# Function: set_widget_opacity - Sets or updates a state, value, or property.
+
+# Function: update_angle_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_rs232_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_autooffcet_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_networkdatabase_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_Buzzer_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_Relay_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_CycleStopTimer_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_AutosaveReading_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_PartTraceability_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_TimetoMasterSet_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_MasterGrouping_toggle - Refreshes values, UI states, or related data.
+
+# Function: update_IOSetting_SaveMasterCalibration_toggle - Refreshes values, UI states, or related data.
+
+# ###File: controller.py
+# Class: AppController - Coordinates application workflow and UI/data interaction.
+# Method: AppController.__init__ - Performs a specific task for the module.
+# Method: AppController.safe_int - Performs a specific task for the module.
+# Method: AppController.toselectProbe_handler - Performs a specific task for the module.
+# Method: AppController.relay_handler - Performs a specific task for the module.
+# Method: AppController.handle_grouping_buttons - Processes an event or user action.
+# Method: AppController.get_last_dimension - Returns a requested value or object.
+# Method: AppController.update_delete_button_visibility - Refreshes values, UI states, or related data.
+# Method: AppController.handle_delete_dimension - Processes an event or user action.
+# Method: AppController.get_selected_master_channels - Returns a requested value or object.
+# Method: AppController.init_progId_and_dimension - Initializes the object or component.
+# Method: AppController.progId_changed_outer - Performs a specific task for the module.
+# Method: AppController.progId_changed_inner - Performs a specific task for the module.
+# Method: AppController.load_as_per_progId - Loads data or configuration into memory.
+# Method: AppController.load_as_per_dimension - Loads data or configuration into memory.
+# Method: AppController.get_channels_for_program - Returns a requested value or object.
+# Method: AppController.Handle_master_Grouping - Processes an event or user action.
+# Method: AppController.handle_set_datetime - Processes an event or user action.
+# Method: AppController.linkage_of_saveButton - Performs a specific task for the module.
+
+# ###File: csv_exporter.py
+# Class: CSVExport - Exports data to files or storage.
+# Method: CSVExport.__init__ - Performs a specific task for the module.
+# Method: CSVExport.export_to_csv - Exports data to a file or external target.
+
+# ###File: data_handler.py
+# Class: DataHandler - Handles events, UI actions, or hardware interaction.
+# Method: DataHandler.__init__ - Performs a specific task for the module.
+# Method: DataHandler.calculate_control_limits - Performs a specific task for the module.
+# Method: DataHandler.update_ui_after_programSettings_saved - Refreshes values, UI states, or related data.
+# Method: DataHandler.set_dimensionName_To_Labels - Sets or updates a state, value, or property.
+# Method: DataHandler.load_databases - Loads data or configuration into memory.
+# Method: DataHandler.load_data_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_ProgramSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_ProbeBasedSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_AOCBasedSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_IOSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler._apply_io_toggle_states - Performs a specific task for the module.
+# Method: DataHandler.load_IPSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_WifiSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_RS232Settings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_NetworkedDatabaseSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.load_AngleCalculationSettings_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.save_toDatabase_programSetting - Persists data or settings.
+# Method: DataHandler.save_toDatabase_probeBasedSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_aocBasedSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_IOSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_IpSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_WifiSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_rs232Settings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_networkedDatabase_settings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_angleCalculationSettings - Persists data or settings.
+# Method: DataHandler.save_toDatabase_cncList - Persists data or settings.
+# Method: DataHandler.save_toDatabase_aocSettings - Persists data or settings.
+# Method: DataHandler.handle_UserModify_clicked - Processes an event or user action.
+# Method: DataHandler.handle_addUser_clicked - Processes an event or user action.
+# Method: DataHandler.save_toDatabase_userManagement - Persists data or settings.
+# Method: DataHandler.save_toDatabase_shiftSettings - Persists data or settings.
+# Method: DataHandler.clear_master_values_ui - Performs a specific task for the module.
+# Method: DataHandler.Hide_rows - Performs a specific task for the module.
+# Method: DataHandler.load_Higher_lower_value_to_ui - Loads data or configuration into memory.
+# Method: DataHandler.get_dimension_list_for_combobox - Returns a requested value or object.
+# Method: DataHandler.update_dimension_combobox - Refreshes values, UI states, or related data.
+# Method: DataHandler.build_probe_unique_string - Performs a specific task for the module.
+# Method: DataHandler.delete_dimension - Performs a specific task for the module.
+# Method: DataHandler.delete_program - Performs a specific task for the module.
+# Method: DataHandler.save_probe_unique_settings - Persists data or settings.
+# Method: DataHandler.regenerate_rs232_instance - Performs a specific task for the module.
+# Method: DataHandler.get_program_list - Returns a requested value or object.
+# Method: DataHandler.setup_program_table - Sets or updates a state, value, or property.
+# Method: DataHandler.load_program_table - Loads data or configuration into memory.
+
+# ###File: database.py
+# Class: DatabaseAgent - Provides database access and persistence operations.
+# Method: DatabaseAgent.__init__ - Performs a specific task for the module.
+# Method: DatabaseAgent.get_all_program_ids - Returns a requested value or object.
+# Method: DatabaseAgent.upsert_wifi_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_ip_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_cnc_list - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_angle_calculation_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.update_networked_database_settings - Refreshes values, UI states, or related data.
+# Method: DatabaseAgent.update_rs232_settings - Refreshes values, UI states, or related data.
+# Method: DatabaseAgent.update_io_settings - Refreshes values, UI states, or related data.
+# Method: DatabaseAgent.update_aoc_settings - Refreshes values, UI states, or related data.
+# Method: DatabaseAgent.upsert_shift_timings - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_user_management - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_program_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_probe_based_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.upsert_aoc_based_settings - Performs a specific task for the module.
+# Method: DatabaseAgent.load_data_to_WifiSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_RS232Settings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_NetworkedDatabaseSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_IPSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_ShiftTimings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_IOSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_AngleCalculationSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_AOCSettings_dict - Loads data or configuration into memory.
+# Method: DatabaseAgent.load_data_to_ProgramSettings_dict - Loads data or configuration into memory.
+
+# ###File: dial_handler.py
+# Class: DialHandler - Handles events, UI actions, or hardware interaction.
+# Method: DialHandler.__init__ - Performs a specific task for the module.
+# Method: DialHandler.set_dial_color - Sets or updates a state, value, or property.
+# Method: DialHandler._on_needle_angle_changed - Performs a specific task for the module.
+# Method: DialHandler._update_needle_spring - Performs a specific task for the module.
+# Method: DialHandler.move_needle - Performs a specific task for the module.
+# Method: DialHandler.angle - Performs a specific task for the module.
+# Method: DialHandler.angle - Performs a specific task for the module.
+
+# ###File: factory_config.py
+# Class: Ui_fact_config - Stores and manages configuration or settings.
+# Method: Ui_fact_config.setupUi - Sets or updates a state, value, or property.
+# Method: Ui_fact_config.retranslateUi - Performs a specific task for the module.
+
+# Class: FactoryConfig - Stores and manages configuration or settings.
+# Method: FactoryConfig.__init__ - Performs a specific task for the module.
+# Method: FactoryConfig.showEvent - Displays a dialog, popup, or interface element.
+# Method: FactoryConfig.save_factory_to_db - Persists data or settings.
+# Method: FactoryConfig.load_factory_from_db - Loads data or configuration into memory.
+# Method: FactoryConfig.on_ok_clicked - Performs a specific task for the module.
+
+# ###File: formulabar.py
+# Class: Ui_Formulabar - Manages UI behavior and layout state.
+# Method: Ui_Formulabar.__init__ - Performs a specific task for the module.
+# Method: Ui_Formulabar.show_numpad - Displays a dialog, popup, or interface element.
+# Method: Ui_Formulabar.push_buttonsubmit_clicked - Performs a specific task for the module.
+
+# ###File: gpio_input_handler.py
+# Class: GpioInputHandler - Handles events, UI actions, or hardware interaction.
+# Method: GpioInputHandler.__init__ - Performs a specific task for the module.
+# Method: GpioInputHandler.run - Executes the main workflow or task.
+# Method: GpioInputHandler.specific_task - Performs a specific task for the module.
+# Method: GpioInputHandler.stop - Performs a specific task for the module.
+# Method: GpioInputHandler.cleanup - Releases resources or shuts down state.
+
+# ###File: help.py
+# Class: AboutPageHandler - Handles events, UI actions, or hardware interaction.
+# Method: AboutPageHandler.__init__ - Performs a specific task for the module.
+# Method: AboutPageHandler.save_modelSerialNumber - Persists data or settings.
+# Method: AboutPageHandler.load_modelSerialNumber - Loads data or configuration into memory.
+# Method: AboutPageHandler.load_modelSerialNumber_toLabels - Loads data or configuration into memory.
+# Method: AboutPageHandler.get_app_image - Returns a requested value or object.
+# Method: AboutPageHandler.update_software_from_usb - Refreshes values, UI states, or related data.
+
+# ###File: letters_keypad.py
+# Class: Keyboard - Defines a reusable component or model.
+# Method: Keyboard.__init__ - Performs a specific task for the module.
+# Method: Keyboard.handle_close - Processes an event or user action.
+# Method: Keyboard.showEvent - Displays a dialog, popup, or interface element.
+# Method: Keyboard.create_keyboard - Builds or instantiates a UI object.
+# Method: Keyboard.create_extra_buttons - Builds or instantiates a UI object.
+# Method: Keyboard.commit_text - Performs a specific task for the module.
+# Method: Keyboard.toggle_case - Performs a specific task for the module.
+# Method: Keyboard.toggle_symbols - Performs a specific task for the module.
+
+# ###File: main.py
+# Class: MainWindow - Represents the main application window.
+# Method: MainWindow.__init__ - Performs a specific task for the module.
+# Method: MainWindow.update_default_formula - Refreshes values, UI states, or related data.
+# Method: MainWindow.generate_Rs232 - Performs a specific task for the module.
+# Method: MainWindow.Gpio_handling - Performs a specific task for the module.
+# Method: MainWindow.show_footswitch_indicator - Displays a dialog, popup, or interface element.
+# Method: MainWindow.open_factory_config - Displays a dialog, popup, or interface element.
+# Method: MainWindow.closeEvent - Releases resources or shuts down state.
+
+# ###File: main_old.py
+# Class: Ui_MainWindow - Represents the main application window.
+# Method: Ui_MainWindow.setupUi - Sets or updates a state, value, or property.
+# Method: Ui_MainWindow.retranslateUi - Performs a specific task for the module.
+
+# ###File: main_ui_18.py
+# Class: Ui_MainWindow - Represents the main application window.
+# Method: Ui_MainWindow.setupUi - Sets or updates a state, value, or property.
+# Method: Ui_MainWindow.retranslateUi - Performs a specific task for the module.
+
+# ###File: master_Setting_handler.py
+# Class: Worker - Runs background processing in a thread.
+# Method: Worker.__init__ - Performs a specific task for the module.
+# Method: Worker.run - Executes the main workflow or task.
+# Method: Worker.update_responsiveness_probesens - Refreshes values, UI states, or related data.
+# Method: Worker.stop - Performs a specific task for the module.
+# Method: Worker.cleanup - Releases resources or shuts down state.
+
+# Class: Set_master_ui - Manages UI behavior and layout state.
+# Method: Set_master_ui.__init__ - Performs a specific task for the module.
+# Method: Set_master_ui.update_spi_value - Refreshes values, UI states, or related data.
+# Method: Set_master_ui._refresh_combined_display - Performs a specific task for the module.
+# Method: Set_master_ui.update_button_position - Refreshes values, UI states, or related data.
+# Method: Set_master_ui.showEvent - Displays a dialog, popup, or interface element.
+# Method: Set_master_ui.showEvent - Displays a dialog, popup, or interface element.
+
+# Class: SetMasterController - Coordinates application workflow and UI/data interaction.
+# Method: SetMasterController.__init__ - Performs a specific task for the module.
+# Method: SetMasterController.get_probe_db_values - Returns a requested value or object.
+# Method: SetMasterController.check_autosense_conflict - Validates a condition or input.
+# Method: SetMasterController.run - Executes the main workflow or task.
+# Method: SetMasterController.calculate_single_master - Performs a specific task for the module.
+# Method: SetMasterController.calculate - Performs a specific task for the module.
+
+# Class: SPIController - Coordinates application workflow and UI/data interaction.
+# Method: SPIController.__init__ - Performs a specific task for the module.
+# Method: SPIController.dimension_cache_status_clear - Performs a specific task for the module.
+# Method: SPIController.calibrate_lower_clicked - Performs a specific task for the module.
+# Method: SPIController.calibrate_higher_clicked - Performs a specific task for the module.
+# Method: SPIController.capture_single_master_spi - Performs a specific task for the module.
+# Method: SPIController.get_dimension_from_probe - Returns a requested value or object.
+# Method: SPIController.setup_auto_save - Sets or updates a state, value, or property.
+# Method: SPIController.update_auto_save - Refreshes values, UI states, or related data.
+# Method: SPIController.handle_save_signal - Processes an event or user action.
+# Method: SPIController.relay_handler - Performs a specific task for the module.
+# Method: SPIController.refresh_settings - Performs a specific task for the module.
+# Method: SPIController.get_all_probe_sensitivity - Returns a requested value or object.
+# Method: SPIController.load_factory_from_db - Loads data or configuration into memory.
+# Method: SPIController.load_responsiveness_probesens - Loads data or configuration into memory.
+# Method: SPIController.on_factory_changed - Performs a specific task for the module.
+# Method: SPIController.spi_handler - Performs a specific task for the module.
+# Method: SPIController.get_processed_spi_map - Returns a requested value or object.
+# Method: SPIController.update_raw_labels - Refreshes values, UI states, or related data.
+# Method: SPIController.resolve_formulas - Performs a specific task for the module.
+# Method: SPIController.set_per_formula - Sets or updates a state, value, or property.
+# Method: SPIController.get_formula_bar - Returns a requested value or object.
+# Method: SPIController.clean_spi_value - Performs a specific task for the module.
+# Method: SPIController.set_master - Sets or updates a state, value, or property.
+# Method: SPIController.save_master_settings_db - Persists data or settings.
+# Method: SPIController.on_master_finished - Performs a specific task for the module.
+# Method: SPIController.load_saved_master_settings - Loads data or configuration into memory.
+# Method: SPIController.smash - Performs a specific task for the module.
+# Method: SPIController.load_least_counts - Loads data or configuration into memory.
+# Method: SPIController.get_lc_cached - Returns a requested value or object.
+# Method: SPIController.map_values - Performs a specific task for the module.
+# Method: SPIController.format_by_leastcount - Performs a specific task for the module.
+# Method: SPIController.ok_notok_part_check - Performs a specific task for the module.
+# Method: SPIController.calculate_angle - Performs a specific task for the module.
+# Method: SPIController.safe_move_needle - Performs a specific task for the module.
+# Method: SPIController.safe_set_dial_color - Performs a specific task for the module.
+# Method: SPIController.get_relay_color - Returns a requested value or object.
+# Method: SPIController.Nomaster_label - Performs a specific task for the module.
+# Method: SPIController.save_worker - Persists data or settings.
+# Method: SPIController.autoSave_Handler - Performs a specific task for the module.
+# Method: SPIController.auto_save_probe_values - Performs a specific task for the module.
+# Method: SPIController.save_probe_values - Persists data or settings.
+# Method: SPIController.load_spc_values - Loads data or configuration into memory.
+# Method: SPIController.__del__ - Performs a specific task for the module.
+
+# ###File: messageBox.py
+# Class: CustomMessageBox - Defines a reusable component or model.
+# Method: CustomMessageBox.__init__ - Performs a specific task for the module.
+# Method: CustomMessageBox._accept - Performs a specific task for the module.
+# Method: CustomMessageBox._reject - Performs a specific task for the module.
+# Method: CustomMessageBox.exec_ - Performs a specific task for the module.
+
+# ###File: models.py
+# Class: UserManagement - Defines a reusable component or model.
+# Method: UserManagement.insert_defaults - Performs a specific task for the module.
+
+# Class: CNCList - Defines a reusable component or model.
+
+# Class: ShiftTimings - Defines a reusable component or model.
+
+# Class: IPSettings - Stores and manages configuration or settings.
+
+# Class: WifiSettings - Stores and manages configuration or settings.
+
+# Class: ProgramSettings - Stores and manages configuration or settings.
+
+# Class: NetworkedDatabaseSettings - Stores and manages configuration or settings.
+# Method: NetworkedDatabaseSettings.insert_defaults - Performs a specific task for the module.
+
+# Class: RS232Settings - Stores and manages configuration or settings.
+# Method: RS232Settings.insert_defaults - Performs a specific task for the module.
+
+# Class: AOCSettings - Stores and manages configuration or settings.
+# Method: AOCSettings.insert_defaults - Performs a specific task for the module.
+
+# Class: AngleCalculationSettings - Stores and manages configuration or settings.
+
+# Class: IOSettings - Stores and manages configuration or settings.
+# Method: IOSettings.insert_defaults - Performs a specific task for the module.
+
+# Class: ProbeBasedSettings - Stores and manages configuration or settings.
+
+# Class: AOCBasedSettings - Stores and manages configuration or settings.
+
+# Class: FactoryConfigSettings - Stores and manages configuration or settings.
+
+# Class: SetMasterSettings - Stores and manages configuration or settings.
+
+# Class: ActiveVariables - Defines a reusable component or model.
+# Method: ActiveVariables.insert_defaults - Performs a specific task for the module.
+
+# ###File: numpad.py
+# Class: Ui_Numpad - Manages UI behavior and layout state.
+# Method: Ui_Numpad.setupUi - Sets or updates a state, value, or property.
+# Method: Ui_Numpad.close_numpad - Releases resources or shuts down state.
+# Method: Ui_Numpad.make_number_handler - Performs a specific task for the module.
+# Method: Ui_Numpad.pushButton_erase_clicked - Performs a specific task for the module.
+# Method: Ui_Numpad.retranslateUi - Performs a specific task for the module.
+
+# Class: numpad_window - Displays an interactive UI dialog or window.
+# Method: numpad_window.__init__ - Performs a specific task for the module.
+# Method: numpad_window.showEvent - Displays a dialog, popup, or interface element.
+# Method: numpad_window.push_buttonsubmit_clicked - Performs a specific task for the module.
+
+# Class: TouchOverlay - Defines a reusable component or model.
+# Method: TouchOverlay.__init__ - Performs a specific task for the module.
+# Method: TouchOverlay.mousePressEvent - Performs a specific task for the module.
+# Method: TouchOverlay.mouseReleaseEvent - Performs a specific task for the module.
+
+# ###File: qt_key.py
+# ###File: resources_rc.py
+# Function: qInitResources - Performs a specific task for the module.
+
+# Function: qCleanupResources - Performs a specific task for the module.
+
+# ###File: serial_handler.py
+# Class: SerialHandler - Handles events, UI actions, or hardware interaction.
+# Method: SerialHandler.__init__ - Performs a specific task for the module.
+# Method: SerialHandler.send_data - Performs a specific task for the module.
+# Method: SerialHandler.__del__ - Performs a specific task for the module.
+
+# ###File: spc_module.py
+# Class: Ui_SPCPage - Manages UI behavior and layout state.
+# Method: Ui_SPCPage.setupUi - Sets or updates a state, value, or property.
+
+# Class: SPCBase - Defines a reusable component or model.
+# Method: SPCBase.__init__ - Performs a specific task for the module.
+# Method: SPCBase.scale_value - Performs a specific task for the module.
+# Method: SPCBase.set_margins - Sets or updates a state, value, or property.
+# Method: SPCBase.draw_background - Performs a specific task for the module.
+# Method: SPCBase.draw_limit_lines - Performs a specific task for the module.
+# Method: SPCBase.init_blank_ui - Initializes the object or component.
+# Method: SPCBase.generate_graph - Performs a specific task for the module.
+# Method: SPCBase.update_graph - Refreshes values, UI states, or related data.
+# Method: SPCBase.__del__ - Performs a specific task for the module.
+
+# Class: SPCWidget - Defines a reusable component or model.
+# Method: SPCWidget.__init__ - Performs a specific task for the module.
+# Method: SPCWidget.update_value - Refreshes values, UI states, or related data.
+
+# Class: SPCManager - Coordinates related objects, state, or workflow.
+# Method: SPCManager.__init__ - Performs a specific task for the module.
+# Method: SPCManager.clear_layout - Performs a specific task for the module.
+# Method: SPCManager.set_active_channels - Sets or updates a state, value, or property.
+# Method: SPCManager.apply_layout - Performs a specific task for the module.
+# Method: SPCManager.update_value - Refreshes values, UI states, or related data.
+
+# ###File: spi_module.py
+# Class: SPI - Handles SPI communication and measurement acquisition.
+# Method: SPI.__init__ - Performs a specific task for the module.
+# Method: SPI.trigger_pulse - Performs a specific task for the module.
+# Method: SPI.spi_transfer - Performs a specific task for the module.
+# Method: SPI.to_signed_16 - Performs a specific task for the module.
+# Method: SPI.update_responsiveness_probesens - Refreshes values, UI states, or related data.
+# Method: SPI.spi_value_emitter - Performs a specific task for the module.
+
+# ###File: statusBarmanager.py
+# Class: PageStatusManager - Coordinates related objects, state, or workflow.
+# Method: PageStatusManager.__init__ - Performs a specific task for the module.
+# Method: PageStatusManager.show - Displays a dialog, popup, or interface element.
+# Method: PageStatusManager.apply_style - Performs a specific task for the module.
+# Method: PageStatusManager.hide - Performs a specific task for the module.
+# Method: PageStatusManager.set_fixed_message - Sets or updates a state, value, or property.
+# Method: PageStatusManager.on_page_changed - Performs a specific task for the module.
+
+# ###File: test_1.py
+# Class: Worker - Runs background processing in a thread.
+# Method: Worker.__init__ - Performs a specific task for the module.
+# Method: Worker.run - Executes the main workflow or task.
+# Method: Worker.stop - Performs a specific task for the module.
+# Method: Worker.cleanup - Releases resources or shuts down state.
+
+# Class: Set_master_ui - Manages UI behavior and layout state.
+# Method: Set_master_ui.__init__ - Performs a specific task for the module.
+# Method: Set_master_ui.update_spi_value - Refreshes values, UI states, or related data.
+# Method: Set_master_ui._refresh_combined_display - Performs a specific task for the module.
+# Method: Set_master_ui.update_button_position - Refreshes values, UI states, or related data.
+# Method: Set_master_ui.center_on_parent - Performs a specific task for the module.
+
+# Class: SetMasterController - Coordinates application workflow and UI/data interaction.
+# Method: SetMasterController.__init__ - Performs a specific task for the module.
+# Method: SetMasterController.get_probe_db_values - Returns a requested value or object.
+# Method: SetMasterController.check_autosense_conflict - Validates a condition or input.
+# Method: SetMasterController.run - Executes the main workflow or task.
+# Method: SetMasterController.calculate - Performs a specific task for the module.
+
+# Class: SPIController - Coordinates application workflow and UI/data interaction.
+# Method: SPIController.__init__ - Performs a specific task for the module.
+# Method: SPIController.handle_save_signal - Processes an event or user action.
+# Method: SPIController.relay_handler - Performs a specific task for the module.
+# Method: SPIController.refresh_settings - Performs a specific task for the module.
+# Method: SPIController.get_all_probe_sensitivity - Returns a requested value or object.
+# Method: SPIController.load_factory_from_db - Loads data or configuration into memory.
+# Method: SPIController.on_factory_changed - Performs a specific task for the module.
+# Method: SPIController.spi_handler - Performs a specific task for the module.
+# Method: SPIController.get_processed_spi_map - Returns a requested value or object.
+# Method: SPIController.update_raw_labels - Refreshes values, UI states, or related data.
+# Method: SPIController.resolve_formulas - Performs a specific task for the module.
+# Method: SPIController.set_per_formula - Sets or updates a state, value, or property.
+# Method: SPIController.get_formula_bar - Returns a requested value or object.
+# Method: SPIController.clean_spi_value - Performs a specific task for the module.
+# Method: SPIController.set_master - Sets or updates a state, value, or property.
+# Method: SPIController.on_master_finished - Performs a specific task for the module.
+# Method: SPIController.smash - Performs a specific task for the module.
+# Method: SPIController.load_least_counts - Loads data or configuration into memory.
+# Method: SPIController.get_lc_cached - Returns a requested value or object.
+# Method: SPIController.map_values - Performs a specific task for the module.
+# Method: SPIController.format_by_leastcount - Performs a specific task for the module.
+# Method: SPIController.ok_notok_part_check - Performs a specific task for the module.
+# Method: SPIController.get_relay_color - Returns a requested value or object.
+# Method: SPIController.Nomaster_label - Performs a specific task for the module.
+# Method: SPIController.save_worker - Persists data or settings.
+# Method: SPIController.save_probe_values - Persists data or settings.
+# Method: SPIController.__del__ - Performs a specific task for the module.
+
+# ###File: ui_handler.py
+# Class: PasswordKeypad - Defines a reusable component or model.
+# Method: PasswordKeypad.__init__ - Performs a specific task for the module.
+# Method: PasswordKeypad.addNumber - Performs a specific task for the module.
+# Method: PasswordKeypad.backspace - Performs a specific task for the module.
+# Method: PasswordKeypad.clearText - Performs a specific task for the module.
+# Method: PasswordKeypad.checkPassword - Validates a condition or input.
+
+# Class: UIHandler - Handles events, UI actions, or hardware interaction.
+# Method: UIHandler.__init__ - Performs a specific task for the module.
+# Method: UIHandler.touch_Calibration_setup - Performs a specific task for the module.
+# Method: UIHandler.open_part_settings - Displays a dialog, popup, or interface element.
+# Method: UIHandler.apply_ProbeBasedSettings_state - Performs a specific task for the module.
+# Method: UIHandler.apply_masterType_state - Performs a specific task for the module.
+# Method: UIHandler.lineedit_opacity - Performs a specific task for the module.
+# Method: UIHandler.apply_line_styles - Performs a specific task for the module.
+# Method: UIHandler.linkage_of_ui - Performs a specific task for the module.
+# Method: UIHandler.linkage_of_backButton - Performs a specific task for the module.
+# Method: UIHandler.handle_aocwidget_backButton - Processes an event or user action.
+# Method: UIHandler.handle_aocwidget_forwardButton - Processes an event or user action.
+# Method: UIHandler.linkage_of_forwardButton - Performs a specific task for the module.
+# Method: UIHandler.toggle_button_eventHandling - Performs a specific task for the module.
+# Method: UIHandler.setup_lineedit_keyboards - Sets or updates a state, value, or property.
+# Method: UIHandler.insert_formula_text - Performs a specific task for the module.
+# Method: UIHandler.linkage_formula_bar - Performs a specific task for the module.
+# Method: UIHandler.set_formula_source - Sets or updates a state, value, or property.
+# Method: UIHandler.handle_add_formula_click - Processes an event or user action.
+# Method: UIHandler.save_formula_to_label - Persists data or settings.
+# Method: UIHandler.delete_last_character - Performs a specific task for the module.
+# Method: UIHandler.apply_keyboard_text - Performs a specific task for the module.
+# Method: UIHandler.on_keyboard_closed - Performs a specific task for the module.
+# Method: UIHandler.on_numpad_closed - Performs a specific task for the module.
+# Method: UIHandler.set_labels_to_header - Sets or updates a state, value, or property.
+# Method: UIHandler.powerButton - Performs a specific task for the module.
+# Method: UIHandler.show_menu - Displays a dialog, popup, or interface element.
+# Method: UIHandler.logout - Performs a specific task for the module.
+# Method: UIHandler.shutdown - Performs a specific task for the module.
+# Method: UIHandler.restart - Performs a specific task for the module.
+# Method: UIHandler.handle_logout - Processes an event or user action.
+# Method: UIHandler.handle_shutdown - Processes an event or user action.
+# Method: UIHandler.handle_restart - Processes an event or user action.
+# Method: UIHandler.eventFilter - Performs a specific task for the module.
+# Method: UIHandler.setup_logoLongPress - Sets or updates a state, value, or property.
+# Method: UIHandler.logo_mousePressEvent - Performs a specific task for the module.
+# Method: UIHandler.logo_mouseReleaseEvent - Performs a specific task for the module.
+# Method: UIHandler.askHiddenPassword - Performs a specific task for the module.
+# Method: UIHandler.verifyHiddenPassword - Performs a specific task for the module.
+
+# ###File: utilities.py
+# Class: Utilities - Defines a reusable component or model.
+# Method: Utilities.__init__ - Performs a specific task for the module.
+# Method: Utilities.validate_formulabar - Validates a condition or input.
+# Method: Utilities.is_raspberry_pi - Performs a specific task for the module.
+# Method: Utilities.is_imx7 - Performs a specific task for the module.
+# Method: Utilities.set_static_ip - Sets or updates a state, value, or property.
+# Method: Utilities.set_static_ip_imx7 - Sets or updates a state, value, or property.
+# Method: Utilities.apply_static_ip - Performs a specific task for the module.
+# Method: Utilities.update_display - Refreshes values, UI states, or related data.
+# Method: Utilities.set_system_time_raspberyPi - Sets or updates a state, value, or property.
+# Method: Utilities.set_system_time_imx7 - Sets or updates a state, value, or property.
+# Method: Utilities.start_clock_updates - Performs a specific task for the module.
+# Method: Utilities.Wifi_Settings - Performs a specific task for the module.
+# Method: Utilities.shutdown_device - Performs a specific task for the module.
+# Method: Utilities.restart_device - Performs a specific task for the module.
+
+# ###File: value.py
+# Class: Value - Defines a reusable component or model.
+# Method: Value.__init__ - Performs a specific task for the module.
+# Method: Value.init_all_dictionaries - Initializes the object or component.
+# Method: Value.init_activeVariables_dictionary - Initializes the object or component.
+# Method: Value.init_mainProgramSettings_dictionary - Initializes the object or component.
+# Method: Value.init_CNCList_dictionary - Initializes the object or component.
+# Method: Value.init_IOSettings_dictionary - Initializes the object or component.
+# Method: Value.init_AngleCalculationSettings_dictionary - Initializes the object or component.
+# Method: Value.init_IPSettings_dictionary - Initializes the object or component.
+# Method: Value.init_NetworkedDatabaseSettings_dictionary - Initializes the object or component.
+# Method: Value.init_RS232Settings_dictionary - Initializes the object or component.
+# Method: Value.init_ShiftTimings_dictionary - Initializes the object or component.
+# Method: Value.init_UserManagment_dictionary - Initializes the object or component.
+# Method: Value.init_WifiSettings_dictionary - Initializes the object or component.
+# Method: Value.init_AOCsettings_dictionary - Initializes the object or component.

@@ -1,0 +1,2381 @@
+# datahandler.py _ old
+from PySide2.QtWidgets import QApplication, QMainWindow, QStackedWidget , QWidget
+from PySide2.QtWidgets import QFrame
+from PySide2.QtWidgets import QLineEdit
+from PySide2 import QtCore, QtWidgets
+from PySide2.QtCore import QTimer, QTime, QDate , QObject , QThread , Signal, Qt, QCoreApplication
+from PySide2.QtGui import QPixmap
+from sqlalchemy.orm import *
+
+import sys
+# import the generated UI class
+from messageBox import CustomMessageBox
+from active_ui_togglebutton_handler import *
+from models import *
+
+from sqlalchemy.orm import Session , sessionmaker
+from serial_handler import SerialHandler
+from models import SessionLocal, ProbeBasedSettings, AOCBasedSettings
+from PySide2.QtGui import QStandardItemModel, QStandardItem
+from decimal import Decimal
+from SaveModels import * #AOCBasedIds,AOCValues
+
+class DataHandler(QObject):
+    """
+    Handles:
+    - Database read/write
+    - Program settings
+    - Probe / AOC / IO / Network configs
+    """
+    dialVisibilityChanged = Signal()
+    io_settings_saved = Signal()
+    probe_setttings_saved = Signal()
+    Rs232_settings_saved = Signal()
+    db_dimension_deleted = Signal()
+    program_deleted = Signal(int)
+    load_program = Signal(int)
+    aoc_settings_saved = Signal(int, str)  
+    def __init__(self, main_window,uiHandler):
+        try:
+            
+            super().__init__()
+            self.ui = main_window
+            self.uiHandler = uiHandler
+            self.load_databases()
+            self.ui.button_addUpdateLogin.clicked.connect(self.save_toDatabase_userManagement)
+            self.ui.button_ProgIdDelete.clicked.connect(self.on_ProgramId_delete_clicked)
+            self.ui.button_ProgIdLoad.clicked.connect(self.on_ProgramId_load_clicked)
+            # -------- cached data --------
+            # self.raw_values = {
+            #     "D1": [],
+            #     "D2": [],
+            #     "D3": [],
+            #     "D4": [],
+            # }
+            self.master_rows = {
+                    "D1": [
+                        self.ui.label_liveD1Val,
+                        self.ui.label_masterD1_1,      # M.L D1 title
+                        self.ui.label_masterD1_2,      # M.H D1 title
+                        self.ui.label_valMasterD1_1,   # value low
+                        self.ui.label_valMasterD1_2,# value high
+                        self.ui.line_10,
+                        self.ui.line_84,
+                        
+                    ],
+                    "D2": [
+                        self.ui.label_liveD2Val,
+                        self.ui.label_masterD2_1,
+                        self.ui.label_masterD2_2,
+                        self.ui.label_valMasterD2_1,
+                        self.ui.label_valMasterD2_2,
+                        self.ui.line_11,
+                        self.ui.line_85,
+                        
+                    ],
+                    "D3": [
+                        self.ui.label_liveD3Val,
+                        self.ui.label_masterD3_1,
+                        self.ui.label_masterD3_2,
+                        self.ui.label_valMasterD3_1,
+                        self.ui.label_valMasterD3_2,
+                        self.ui.line_12,
+                        self.ui.line_86,
+                    ],
+                    "D4": [
+                        self.ui.label_liveD4val,
+                        self.ui.label_masterD4_1,
+                        self.ui.label_masterD4_2,
+                        self.ui.label_valMasterD4_1,
+                        self.ui.label_valMasterD4_2,
+                        self.ui.line_87,
+                    ],
+                }
+            self.master_value_labels = {
+                    "D1": {
+                        "high": self.ui.label_valMasterD1_2,
+                        "low":  self.ui.label_valMasterD1_1,
+                    },
+                    "D2": {
+                        "high": self.ui.label_valMasterD2_2,
+                        "low":  self.ui.label_valMasterD2_1,
+                    },
+                    "D3": {
+                        "high": self.ui.label_valMasterD3_2,
+                        "low":  self.ui.label_valMasterD3_1,
+                    },
+                    "D4": {
+                        "high": self.ui.label_valMasterD4_2,
+                        "low":  self.ui.label_valMasterD4_1,
+                    },
+                }
+            #this signale used to change directly value  lcl and usl after calculting avg of 70% 
+            self.ui.lineEdit_nominalValue.textChanged.connect(self.calculate_control_limits)
+            self.ui.lineEdit_lsl.textChanged.connect(self.calculate_control_limits)
+            self.ui.lineEdit_usl.textChanged.connect(self.calculate_control_limits)
+            
+            self.selected_user_id = None
+            self.is_modify_mode = False
+            self.setup_program_table()
+            self.load_data_to_ui()
+            self.last_selected_row = -1
+            self.update_ui_after_programSettings_saved()
+            self.update_aoc_dimension_combobox(int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1")))
+            self.probe_save_error = False
+            self.Rs232_settings_saved.connect(self.regenerate_rs232_instance)
+            self.probe_setttings_saved.connect(self.update_ui_after_programSettings_saved)    
+        except Exception as e:
+            print(f"Error in initilization of Data Handler {e}")
+    # Calculate 70% derived lower/upper control limits from nominal, LSL, and USL values
+    def calculate_control_limits(self):
+        # calculates 70% value to add in lcl and ucl directly after three texts graps.
+        nominal_text = self.ui.lineEdit_nominalValue.text().strip()
+        lsl_text = self.ui.lineEdit_lsl.text().strip()
+        usl_text = self.ui.lineEdit_usl.text().strip()
+
+        # Wait until all three fields have valid text
+        if not nominal_text or not lsl_text or not usl_text:
+            return
+
+        try:
+            nominal = float(nominal_text)
+            lsl = float(lsl_text)
+            usl = float(usl_text)
+
+            lcl = nominal - ((nominal - lsl) * 0.70)
+            ucl = nominal + ((usl - nominal) * 0.70)
+
+            if not self.ui.lineEdit_lcl.text().strip():
+                self.ui.lineEdit_lcl.setText(f"{lcl}.5f")
+
+            if not self.ui.lineEdit_ucl.text().strip():
+                self.ui.lineEdit_ucl.setText(f"{ucl}.5f")
+
+        except ValueError as e:
+            print("calculate_control_limits:", e)
+    
+    #update ui after programsetting saved (help fun for refresh ui)    
+    def update_ui_after_programSettings_saved(self):
+        try:
+            current_dim = self.ui.comboBox_toselectProbe.currentText()
+
+            self.ui.valueObj.ProgramSettings_dict = \
+                self.ui.databaseObj.load_data_to_ProgramSettings_dict(
+                    int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))
+                )
+            self.update_dimension_combobox(keep_dimension=current_dim)
+            self.load_program_table()
+            self.load_Higher_lower_value_to_ui(int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1")))
+            # QTimer.singleShot(100, lambda: self.ui.spc_manager.load_program_OnSpc(int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))))
+            # self.ui.spc_manager.load_program_OnSpc(int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1")))
+            # self.ui.spc_manager.load_previous_spc_values()
+            self.set_dimensionName_To_Labels()
+            self.dialVisibilityChanged.emit()
+            # self.set_dimensionName_To_Labels()
+        except Exception as e:
+            print(f"Error in update_ui_after_programming {e}")
+    def show_job_count_on_dimension_labels(self, saved_job_counts):
+        """
+        Temporarily show Job Count on label_D1name ... label_D4name.
+
+        saved_job_counts:
+            [
+                ("D1", 5),
+                ("D2", 8),
+            ]
+
+        After 3 seconds, original dimension-name labels are restored.
+        """
+        try:
+            if not hasattr(self, "_job_count_label_originals"):
+                self._job_count_label_originals = {}
+
+            if not hasattr(self, "_job_count_timers"):
+                self._job_count_timers = {}
+
+            for dim, job_count in saved_job_counts:
+
+                if not dim or not dim.startswith("D"):
+                    continue
+
+                try:
+                    dim_no = int(dim[1:])
+                except (ValueError, TypeError):
+                    continue
+
+                if dim_no < 1 or dim_no > 4:
+                    continue
+
+                label = getattr(
+                    self.ui,
+                    f"label_D{dim_no}name",
+                    None
+                )
+
+                if label is None:
+                    continue
+
+                # -------------------------------------------------
+                # Save original text/font only first time
+                # -------------------------------------------------
+                if dim not in self._job_count_label_originals:
+                    self._job_count_label_originals[dim] = (
+                        label.text(),
+                        label.font()
+                    )
+
+                # -------------------------------------------------
+                # Cancel previous timer for this dimension
+                # -------------------------------------------------
+                old_timer = self._job_count_timers.get(dim)
+
+                if old_timer is not None:
+                    old_timer.stop()
+                    old_timer.deleteLater()
+
+                # -------------------------------------------------
+                # Temporary Job Count display
+                # -------------------------------------------------
+                label.setText(
+                    f"Job Count\n{job_count}"
+                )
+
+                # Make font bigger + bold
+                font = label.font()
+                font.setBold(True)
+
+                # Increase current font size
+                original_font = self._job_count_label_originals[dim][1]
+                new_size = max(original_font.pointSize() + 4, 14)
+
+                font.setPointSize(new_size)
+
+                label.setFont(font)
+
+                # -------------------------------------------------
+                # Restore after 3 seconds
+                # -------------------------------------------------
+                timer = QTimer(self.ui)
+                timer.setSingleShot(True)
+
+                def restore_label(
+                    dim=dim,
+                    label=label,
+                    timer=timer
+                ):
+                    try:
+                        original = self._job_count_label_originals.get(dim)
+
+                        if original:
+                            original_text, original_font = original
+
+                            label.setText(original_text)
+                            label.setFont(original_font)
+
+                        self._job_count_timers.pop(dim, None)
+
+                        timer.deleteLater()
+
+                    except Exception as e:
+                        print(
+                            f"Error restoring job count label "
+                            f"for {dim}: {e}"
+                        )
+
+                timer.timeout.connect(restore_label)
+
+                self._job_count_timers[dim] = timer
+
+                timer.start(4000)
+
+        except Exception as e:
+            print(
+                f"Error in show_job_count_on_dimension_labels: {e}"
+            )   
+    def set_dimensionName_To_Labels(self):
+        try:
+            for i in range(1, 5):
+                try:
+                    dim_name = self.ui.valueObj.ProgramSettings_dict.get(f"D{i}", {}) \
+                        .get("ProbeBasedSettings", {}) \
+                        .get("DimensionName", "")
+
+                    getattr(self.ui, f"label_D{i}name").setText(f"D{i} {dim_name}")
+                except Exception:
+                    getattr(self.ui, f"label_D{i}name").setText("")        
+        except Exception as e:
+            print(f"Error in set_dimensionName_To_Labels: {e}")
+    # -------- LOAD --------
+    def load_databases(self):
+        try:
+            self.ui.valueObj.WifiSettings_dict = self.ui.databaseObj.load_data_to_WifiSettings_dict()
+        except Exception as e:
+            print(f"Error loading WifiSettings: {e}")
+            self.ui.valueObj.WifiSettings_dict = {}  # set default
+
+        try:
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            #print("default Program Id..............................................",default_programId)
+            self.ui.valueObj.AngleCalculationSettings_dict = self.ui.databaseObj.load_data_to_AngleCalculationSettings_dict(str(default_programId))
+        except Exception as e:
+            print(f"Error loading AngleCalculationSettings: {e}")
+            self.ui.valueObj.AngleCalculationSettings_dict = {}
+
+        try:
+            self.ui.valueObj.AOCSettings_dict = self.ui.databaseObj.load_data_to_AOCSettings_dict()
+        except Exception as e:
+            print(f"Error loading AOCSettings: {e}")
+            self.ui.valueObj.AOCSettings_dict = {}
+
+        try:
+            self.ui.valueObj.IOSettings_dict = self.ui.databaseObj.load_data_to_IOSettings_dict()
+        except Exception as e:
+            print(f"Error loading IOSettings: {e}")
+            self.ui.valueObj.IOSettings_dict = {}
+
+        try:
+            self.ui.valueObj.IPSettings_dict = self.ui.databaseObj.load_data_to_IPSettings_dict()
+        except Exception as e:
+            print(f"Error loading IPSettings: {e}")
+            self.ui.valueObj.IPSettings_dict = {}
+
+        try:
+            self.ui.valueObj.NetworkedDatabaseSettings_dict = self.ui.databaseObj.load_data_to_NetworkedDatabaseSettings_dict()
+        except Exception as e:
+            print(f"Error loading NetworkedDatabaseSettings: {e}")
+            self.ui.valueObj.NetworkedDatabaseSettings_dict = {}
+
+        try:
+            self.ui.valueObj.RS232Settings_dict = self.ui.databaseObj.load_data_to_RS232Settings_dict()
+        except Exception as e:
+            print(f"Error loading RS232Settings: {e}")
+            self.ui.valueObj.RS232Settings_dict = {}
+
+        try:
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            self.ui.valueObj.ProgramSettings_dict = self.ui.databaseObj.load_data_to_ProgramSettings_dict(int(default_programId))
+        except Exception as e:
+            print(f"Error loading ProgramSettings: {e}")
+            self.ui.valueObj.ProgramSettings_dict = {}
+
+    #load data to ui
+    def load_data_to_ui(self):
+        try:
+            # current_dim = self.ui.comboBox_toselectProbe.currentText()
+            self.load_IOSettings_to_ui()
+            self.load_IPSettings_to_ui()
+            self.load_NetworkedDatabaseSettings_to_ui()
+            self.load_ProgramSettings_to_ui()
+            self.load_RS232Settings_to_ui()
+            self.load_WifiSettings_to_ui()
+            self.load_AocSettings_to_ui()
+            # self.load_ProbeBasedSettings_to_ui(current_dim)
+        except Exception as e:
+            print(f"Error on load data to ui {e}")
+    
+    #load programsetting to ui      
+    def load_ProgramSettings_to_ui(self):
+        try:
+            #print(self.ui.valueObj.ProgramSettings_dict,'nanana')
+            # Ensure ProgramSettings_dict is loaded. This method should ideally take a program_id.
+            # For now, it uses the hardcoded example from value.py or attempts to load program_id 1.
+            if not hasattr(self.ui.valueObj, 'ProgramSettings_dict') or not self.ui.valueObj.ProgramSettings_dict:
+                # print("Warning: ProgramSettings_dict not loaded. Attempting to load default.")
+                self.ui.valueObj.ProgramSettings_dict = self.ui.databaseObj.load_data_to_ProgramSettings_dict(1) # Assuming program_id 1 as default
+
+            program_specific_settings = self.ui.valueObj.ProgramSettings_dict.get('ProgramSpecificSettings', {})
+
+            self.ui.lineEdit_programNameSettings.setText(str(program_specific_settings.get("ProgramName", "")))
+            self.ui.label_programName.setText(str(program_specific_settings.get("ProgramName", "")))
+        
+            if program_specific_settings.get("Mode") == 'Combine':
+                self.ui.radioButton_modeCombine.setChecked(True)
+                self.ui.radioButton_modeIndividual.setChecked(False)
+            elif program_specific_settings.get("Mode") == 'Individual':
+                self.ui.radioButton_modeIndividual.setChecked(True)
+                self.ui.radioButton_modeCombine.setChecked(False)        
+
+            if program_specific_settings.get("Uom") == 'inch':
+                self.ui.radioButton_inch.setChecked(True)
+                self.ui.radioButton_mm.setChecked(False)
+            elif program_specific_settings.get("Uom") == 'mm':
+                self.ui.radioButton_mm.setChecked(True)
+                self.ui.radioButton_inch.setChecked(False)
+
+            self.ui.lineEdit_DurationAutosave.setText(str(program_specific_settings.get("AutoSave_Duration", "0.0")))
+            self.ui.lineEdit_Responsiveness.setText(str(program_specific_settings.get("Responsiveness", "0")))
+            # Get all existing dimension keys (those starting with 'D')
+            existing_dims = [key for key in self.ui.valueObj.ProgramSettings_dict.keys() if key.startswith('D')]
+
+            # Sort them numerically (D1, D2, ...)
+            existing_dims.sort(key=lambda x: int(x[1:]))
+
+            # Determine next dimension to add (limit D8)
+            if existing_dims:
+                last_idx = int(existing_dims[-1][1:])
+            else:
+                last_idx = 0
+
+            # Build the list for combo box entries, up to D8
+            combo_entries = [f"D{i}" for i in range(1, min(last_idx + 2, 9))]
+
+            self.ui.comboBox_toselectProbe.clear()      # Clear previous items
+            self.ui.comboBox_toselectProbe.addItems(combo_entries)
+        except Exception as e:
+            print(f"Error loading ProgramSettings to UI: {e}")
+
+    #load probeBasedSettings to ui
+    def load_ProbeBasedSettings_to_ui(self,dimension):
+        try:
+            # 1️⃣ ALWAYS RESET UI FIRST (VERY IMPORTANT)
+            self.ui.lineEdit_dimensionName.setText("")
+            self.ui.label_formulaBar.setText("")
+            self.ui.comboBox_masterType.setCurrentText("Double Master")
+
+            self.ui.lineEdit_masterLower.setText("")
+            self.ui.lineEdit_master.setText("")
+            self.ui.lineEdit_masterHigher.setText("")
+
+            # self.ui.lineEdit_upperOffcetLimit.setText("")
+            self.ui.lineEdit_usl.setText("")
+            self.ui.lineEdit_ucl.setText("")
+            self.ui.lineEdit_nominalValue.setText("")
+            self.ui.lineEdit_lcl.setText("")
+            self.ui.lineEdit_lsl.setText("")
+            # self.ui.lineEdit_lowerOffsetLimit.setText("")
+
+            self.ui.comboBox_ovalityOnOff.setCurrentText("")
+            self.ui.comboBox_rangeProbe.setCurrentText("")
+            self.ui.comboBox_methodProbe.setCurrentText("")
+            self.ui.comboBox_caseProbe.setCurrentText("")
+
+            self.ui.lineEdit_caseT.setText("")
+            self.ui.lineEdit_probeSensitivity.setText("")
+            self.ui.lineEdit_airSensitivityQuotient.setText("")
+
+            # self.comboBox_ovalityOnOff.blockSignals(True)
+            # self.comboBox_masterType.blockSignals(True)
+            # 2️⃣ ENSURE DICT IS LOADED
+            if not hasattr(self.ui.valueObj, 'ProgramSettings_dict') or not self.ui.valueObj.ProgramSettings_dict:
+                self.ui.valueObj.ProgramSettings_dict = self.ui.databaseObj.load_data_to_ProgramSettings_dict(
+                    int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))
+                )
+
+            # 3️⃣ GET DIMENSION DATA
+            dim_data = self.ui.valueObj.ProgramSettings_dict.get(dimension)
+            if not dim_data:
+                return  # UI already cleared
+
+            # 4️⃣ LOAD DATA (ONLY IF EXISTS)
+            probe_settings = dim_data.get("ProbeBasedSettings", {})
+            # print("MasterType:",str(probe_settings.get("MasterType", "")))
+            self.ui.lineEdit_programNameSettings.setText(str(probe_settings.get("ProgramName", "")))
+            self.ui.label_programName.setText(str(probe_settings.get("ProgramName", "")))
+            self.ui.lineEdit_dimensionName.setText(str(probe_settings.get("DimensionName", "")))
+            self.ui.label_formulaBar.setText(str(probe_settings.get("Formula", "")))
+
+            self.ui.comboBox_masterType.setCurrentText(str(probe_settings.get("MasterType", "")))
+
+
+            self.ui.lineEdit_masterLower.setText(str(probe_settings.get("MasterLower", "")))
+            self.ui.lineEdit_master.setText(str(probe_settings.get("Master", "")))
+            self.ui.lineEdit_masterHigher.setText(str(probe_settings.get("MasterHigher", "")))
+
+            # self.ui.lineEdit_upperOffcetLimit.setText(str(probe_settings.get("UpperOffsetLimit", "")))
+            self.ui.lineEdit_usl.setText(str(probe_settings.get("UpperSpecificationLimit", "")))
+            self.ui.lineEdit_ucl.setText(str(probe_settings.get("UpperControlLimit", "")))
+            self.ui.lineEdit_nominalValue.setText(str(probe_settings.get("NominalValue", "")))
+            self.ui.lineEdit_lcl.setText(str(probe_settings.get("LowerControlLimit", "")))
+            self.ui.lineEdit_lsl.setText(str(probe_settings.get("LowerSpecificationLimit", "")))
+            # self.ui.lineEdit_lowerOffsetLimit.setText(str(probe_settings.get("LowerOffsetLimit", "")))
+
+            self.ui.comboBox_ovalityOnOff.setCurrentText(str(probe_settings.get("Ovality", "")))
+            self.ui.comboBox_rangeProbe.setCurrentText(str(probe_settings.get("Range", "")))
+            self.ui.comboBox_methodProbe.setCurrentText(str(probe_settings.get("Method", "")))
+            self.ui.comboBox_caseProbe.setCurrentText(str(probe_settings.get("Case", "")))
+
+            self.ui.lineEdit_caseT.setText(str(probe_settings.get("CaseT", "")))
+            
+            # self.ui.lineEdit_leastCount.setCurrentText(str(probe_settings.get("LeastCount", "")))
+            least = probe_settings.get("LeastCount", "")
+            least = format(Decimal(str(least)), "f")
+            self.ui.lineEdit_leastCount.setCurrentText(least)
+            
+            self.ui.lineEdit_probeSensitivity.setText(str(probe_settings.get("ProbeSensitivity", "")))
+            self.ui.lineEdit_airSensitivityQuotient.setText(str(probe_settings.get("AirSensitivityQuotient", "")))
+
+            # 🔥 FORCE final state
+            self.uiHandler.apply_ProbeBasedSettings_state()
+            self.uiHandler.apply_masterType_state()
+
+            
+        except Exception as e:
+            print(f"Error loading ProbeBasedSettings for {dimension}: {e}")
+
+    #load AocBasedSettings to ui
+    def load_AOCBasedSettings_to_ui(self,dimension):
+        try:
+            # self.ui.comboBox_aocEnableONOFF.setCurrentText(" ")  
+            self.ui.radioButton_aocEnableOFF.setChecked(True)
+            self.ui.comboBox_axis.setCurrentText(" ")
+            self.ui.lineEdit_offsetNo.setText(" ")
+            
+            self.ui.lineEdit_upperOffcetLimit.setText("")
+            self.ui.lineEdit_lowerOffsetLimit.setText("")
+
+            self.ui.comboBox_machine.setCurrentText(" ")
+            self.ui.comboBox_direction.setCurrentText(" ")
+
+            self.ui.lineEdit_turretNo.setText(" ")
+            self.ui.lineEdit_workInProcess.setText(" ")
+            self.ui.lineEdit_skipOffsetCount.setText(" ")
+            # Ensure ProgramSettings_dict is loaded
+            if not hasattr(self.ui.valueObj, 'ProgramSettings_dict') or not self.ui.valueObj.ProgramSettings_dict:
+                # print("Warning: ProgramSettings_dict not loaded. Attempting to load default.")
+                #self.ui.valueObj.ProgramSettings_dict = self.ui.databaseObj.load_data_to_ProgramSettings_dict(1) # Assuming program_id 1 as default
+                self.ui.valueObj.ProgramSettings_dict = \
+                    self.ui.databaseObj.load_data_to_ProgramSettings_dict(
+                    int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))
+                    )
+            # Check if the dimension exists in the dictionary
+            dim_data = self.ui.valueObj.ProgramSettings_dict.get(dimension)
+            if not dim_data:
+                # print(f"{dimension} not found in ProgramSettings_dict")
+                return
+
+            aoc_settings = dim_data.get("AOCBasedSettings", {})
+            if aoc_settings.get("aocEnable") == 'ON':
+                self.ui.radioButton_aocEnableOn.setChecked(True)
+                self.ui.radioButton_aocEnableOFF.setChecked(False)
+            elif aoc_settings.get("aocEnable") == 'OFF':
+                self.ui.radioButton_aocEnableOFF.setChecked(True)
+                self.ui.radioButton_aocEnableOn.setChecked(False)              
+            # self.ui.comboBox_aocEnableONOFF.setCurrentText(str(aoc_settings.get("aocEnable", "")))
+            self.ui.comboBox_axis.setCurrentText(str(aoc_settings.get("Axis", "")))
+            self.ui.lineEdit_offsetNo.setText(str(aoc_settings.get("OffsetNo", " ")))
+            self.ui.lineEdit_upperOffcetLimit.setText(str(aoc_settings.get("UpperOffsetLimit", "")))
+            self.ui.lineEdit_lowerOffsetLimit.setText(str(aoc_settings.get("LowerOffsetLimit", "")))
+
+            self.ui.comboBox_machine.setCurrentText(str(aoc_settings.get("Machine", "")))
+            self.ui.comboBox_direction.setCurrentText(str(aoc_settings.get("Direction", "")))
+
+            self.ui.lineEdit_turretNo.setText(str(aoc_settings.get("TurretNo", " ")))
+            self.ui.lineEdit_workInProcess.setText(str(aoc_settings.get("WorkInProcess", " ")))
+            self.ui.lineEdit_skipOffsetCount.setText(str(aoc_settings.get("SkipOffsetCount"," ")))
+            # Force enable/disable according to loaded radio button
+        except Exception as e:
+            print(f"Error loading AOCBasedSettings to UI for dimension {dimension}: {e}")
+    def update_aoc_dimension_combobox(self, program_id=None):
+        try:
+            combo = self.ui.comboBox_dim
+
+            if program_id is None:
+                program_id = self.safe_int(
+                    self.ui.valueObj.activeVariables_dict.get(
+                        "ActiveProgramId", 1
+                    )
+                )
+
+            combo.blockSignals(True)
+
+            current_text = combo.currentText()
+
+            combo.clear()
+            combo.addItem("ALL")
+
+            # Global AOC check
+            aoc_global = (
+                self.ui.valueObj.AOCSettings_dict
+                .get("AOC_ON_OFF", "OFF")
+            )
+
+            if str(aoc_global).strip().upper() != "ON":
+                combo.blockSignals(False)
+                return
+
+            # Get only AOC settings for this program
+            with SessionLocal() as session:
+
+                rows = (
+                    session.query(AOCBasedSettings)
+                    .filter(
+                        AOCBasedSettings.ProgramId == program_id
+                    )
+                    .all()
+                )
+
+                dimensions = []
+
+                for row in rows:
+
+                    dim = str(row.Dimension or "").strip().upper()
+                    enabled = str(row.aocEnable or "").strip().upper()
+
+                    if (
+                        enabled == "ON"
+                        and dim.startswith("D")
+                        and dim[1:].isdigit()
+                    ):
+                        number = int(dim[1:])
+
+                        if 1 <= number <= 8:
+                            dimensions.append(dim)
+
+            # D1, D2, D3...
+            dimensions = sorted(
+                set(dimensions),
+                key=lambda x: int(x[1:])
+            )
+
+            combo.addItems(dimensions)
+
+            # Restore previous selection if possible
+            if current_text in dimensions or current_text == "ALL":
+                combo.setCurrentText(current_text)
+            else:
+                combo.setCurrentIndex(0)
+
+            combo.blockSignals(False)
+
+            # print(
+            #     f"AOC combo updated: "
+            #     f"Program={program_id}, "
+            #     f"Dimensions={dimensions}"
+            # )
+
+        except Exception as e:
+
+            try:
+                combo.blockSignals(False)
+            except Exception:
+                pass
+
+            print(
+                f"Error in update_aoc_dimension_combobox: {e}"
+            )
+    #load iosettings to ui
+    def load_IOSettings_to_ui(self):
+        try:
+            # Ensure the dictionary is loaded before trying to access it
+            if not hasattr(self.ui.valueObj, 'IOSettings_dict') or not self.ui.valueObj.IOSettings_dict:
+                self.ui.valueObj.IOSettings_dict = self.ui.databaseObj.load_data_to_IOSettings_dict()
+
+            # Use .get() with default values to prevent KeyError if a key is missing
+            io_dict = self.ui.valueObj.IOSettings_dict or {}
+            #print("IO_Setting loading", io_dict)
+
+            if io_dict.get("AUTO_SAVE_READING", {}).get("Enable") == '0':
+                self.ui.toggelButton_autoSaveReading.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("AUTO_SAVE_READING", {}).get("Enable") == '1':
+                self.ui.toggelButton_autoSaveReading.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("BUZZER", {}).get("Enable") == '0':
+                self.ui.toggleButton_buzzer.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("BUZZER", {}).get("Enable") == '1':
+                self.ui.toggleButton_buzzer.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("CYCLE_STOP_TIMER", {}).get("Enable") == '0':
+                self.ui.toggelButton_cycleStopTimer.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("CYCLE_STOP_TIMER", {}).get("Enable") == '1':
+                self.ui.toggelButton_cycleStopTimer.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("MASTER_GROUPING", {}).get("Enable") == '0':
+                self.ui.toggleButton_masterGrouping.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("MASTER_GROUPING", {}).get("Enable") == '1':
+                self.ui.toggleButton_masterGrouping.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("PART_TRACEABILITY", {}).get("Enable") == '0':
+                self.ui.toggelButton_partTraceability.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("PART_TRACEABILITY", {}).get("Enable") == '1':
+                self.ui.toggelButton_partTraceability.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("RELAY", {}).get("Enable") == '0':
+                self.ui.toggelButton_relay.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("RELAY", {}).get("Enable") == '1':
+                self.ui.toggelButton_relay.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("TIME_TO_MASTER_SET", {}).get("Enable") == '0':
+                self.ui.toggleButtontimeToSetMaster.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("TIME_TO_MASTER_SET", {}).get("Enable") == '1':
+                self.ui.toggleButtontimeToSetMaster.setPixmap(QPixmap("toggle_on.png"))
+
+            if io_dict.get("BUZZER", {}).get("Value") == 'Ok':
+                self.ui.radioButton_okBuzzer.setChecked(True)
+                self.ui.radioButton_reworkNotokBuzzer.setChecked(False)
+            elif io_dict.get("BUZZER", {}).get("Value") == 'Rework / Not Ok':
+                self.ui.radioButton_reworkNotokBuzzer.setChecked(True)
+                self.ui.radioButton_okBuzzer.setChecked(False)
+            
+            self.ui.lineEdit_relayTime.setText(io_dict.get("RELAY", {}).get("Value", ""))
+            self.ui.lineEdit_cycleTime.setText(io_dict.get("CYCLE_STOP_TIMER", {}).get("Value", ""))
+
+            if io_dict.get("PART_TRACEABILITY", {}).get("Value") == 'Manual Reset':
+                self.ui.radioButton_manualPartTraceability.setChecked(True)
+                self.ui.radioButton_autoPartTraceability.setChecked(False)
+            elif io_dict.get("PART_TRACEABILITY", {}).get("Value") == 'Auto Reset':
+                self.ui.radioButton_autoPartTraceability.setChecked(True)
+                self.ui.radioButton_manualPartTraceability.setChecked(False)
+            # SAVE MASTER CALIBRATION
+            if io_dict.get("SAVE_MASTER_CALIBRATION", {}).get("Enable") == 'OFF':
+                self.ui.toggleButtonSaveMasterCalibration.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif io_dict.get("SAVE_MASTER_CALIBRATION", {}).get("Enable") == 'ON':
+                self.ui.toggleButtonSaveMasterCalibration.setPixmap(QPixmap("toggle_on.png"))
+                    
+                
+            self.ui.lineEdit_timeToMasterSet.setText(io_dict.get("TIME_TO_MASTER_SET", {}).get("Value", ""))
+            QTimer.singleShot(0, self._apply_io_toggle_states)
+        except Exception as e:
+            print(f"Error loading IOSettings to UI: {e}")
+    
+    def _apply_io_toggle_states(self):
+        try:
+            update_IOSetting_Buzzer_toggle(self.ui)
+            update_IOSetting_Relay_toggle(self.ui)
+            update_IOSetting_CycleStopTimer_toggle(self.ui)
+            update_IOSetting_AutosaveReading_toggle(self.ui)
+            update_IOSetting_PartTraceability_toggle(self.ui)
+            update_IOSetting_TimetoMasterSet_toggle(self.ui)
+            update_IOSetting_MasterGrouping_toggle(self.ui)
+            update_IOSetting_SaveMasterCalibration_toggle(self.ui)
+        except Exception as e:
+            print(f"Error applying IO toggle states: {e}")
+
+    #load ipsettings to ui
+    def load_IPSettings_to_ui(self):
+        try:
+            # Ensure the dictionary is loaded before trying to access it
+            if not hasattr(self.ui.valueObj, 'IPSettings_dict') or not self.ui.valueObj.IPSettings_dict:
+                self.ui.valueObj.IPSettings_dict = self.ui.databaseObj.load_data_to_IPSettings_dict()
+            
+            # ip_dict = self.ui.valueObj.IPSettings_dict
+            #print("Ip_Setting loading.....", ip_dict)
+
+            self.ui.lineEdit_selfIp.setText(self.ui.valueObj.IPSettings_dict.get("SelfIPAddress", ""))
+            self.ui.lineEdit_subnetMask.setText(self.ui.valueObj.IPSettings_dict.get("SubnetMask", ""))
+            self.ui.lineEdit_defaultGateway.setText(self.ui.valueObj.IPSettings_dict.get("DefaultGateway", ""))
+            
+        except Exception as e:
+            print(f"Error loading IPSettings to UI: {e}")
+
+    
+    #load wifisettings to ui
+    def load_WifiSettings_to_ui(self):
+        try:
+            # Ensure the dictionary is loaded before trying to access it
+            if not hasattr(self.ui.valueObj, 'WifiSettings_dict') or not self.ui.valueObj.WifiSettings_dict:
+                self.ui.valueObj.WifiSettings_dict = self.ui.databaseObj.load_data_to_WifiSettings_dict()
+            
+            # wifi_dict = self.ui.valueObj.WifiSettings_dict
+            #print("wifi setting loading: ....",wifi_dict)
+
+            self.ui.lineEdit_wifiSsid.setText(self.ui.valueObj.WifiSettings_dict.get("WifiSSID", ""))
+            self.ui.lineEdit_wifiPassword.setText(self.ui.valueObj.WifiSettings_dict.get("WifiPassword", ""))
+        except Exception as e:
+            print(f"Error loading WifiSettings to UI: {e}")
+    
+    #load rs232settings to ui
+    def load_RS232Settings_to_ui(self):
+        try:
+            # Ensure the dictionary is loaded before trying to access it
+            if not hasattr(self.ui.valueObj, 'RS232Settings_dict') or not self.ui.valueObj.RS232Settings_dict:
+                self.ui.valueObj.RS232Settings_dict = self.ui.databaseObj.load_data_to_RS232Settings_dict()
+
+            rs232_dict = self.ui.valueObj.RS232Settings_dict
+            #print("loading rs232_dict is : ",rs232_dict)
+
+            if rs232_dict.get("RS232_ON_OFF") == 'OFF':
+                self.ui.toggleButton_rs232.setPixmap(QPixmap("Switcher_OFF.png"))
+            elif rs232_dict.get("RS232_ON_OFF") == 'ON':
+                self.ui.toggleButton_rs232.setPixmap(QPixmap("toggle_on.png"))
+
+            self.ui.comboBox_baudRate.setCurrentText(rs232_dict.get("BAUD_RATE", ""))
+            self.ui.comboBox_dataBits.setCurrentText(rs232_dict.get("DATA_BITS", ""))
+            self.ui.comboBox_parity.setCurrentText(rs232_dict.get("PARITY", ""))
+            self.ui.comboBox_stopBits.setCurrentText(rs232_dict.get("STOP_BITS", ""))
+            self.ui.comboBox_flowControl.setCurrentText(rs232_dict.get("FLOW_CONTROL", ""))
+            self.ui.lineEdit_portName.setText(rs232_dict.get("PORT_NAME", "")) # Corrected from comboBox_baudRate.setText
+            update_rs232_toggle(self.ui)
+            
+        except Exception as e:
+            print(f"Error loading RS232Settings to UI: {e}")
+
+    #load networkedDatabaseSettings to ui
+    def load_NetworkedDatabaseSettings_to_ui(self):
+        try:
+            # Ensure dict exists
+            if not hasattr(self.ui.valueObj, 'NetworkedDatabaseSettings_dict') or not self.ui.valueObj.NetworkedDatabaseSettings_dict:
+                self.ui.valueObj.NetworkedDatabaseSettings_dict = self.ui.databaseObj.load_data_to_NetworkedDatabaseSettings_dict()
+
+            db_dict = self.ui.valueObj.NetworkedDatabaseSettings_dict
+            
+            #print("Loaded Network DB settings:", db_dict)
+            # Always set lineEdit values first
+            self.ui.lineEdit_driverNameDb.setText(db_dict.get("MS_SQL_DRIVER_NAME", ""))
+            self.ui.lineEdit_serverNameDb.setText(db_dict.get("MS_SQL_SERVER_NAME", ""))
+            self.ui.lineEdit_databaseNameDb.setText(db_dict.get("MS_SQL_DATABASE_NAME", ""))
+            self.ui.lineEdit_usernameDb.setText(db_dict.get("MS_SQL_USERNAME", ""))
+            self.ui.lineEdit_passwordDb.setText(db_dict.get("MS_SQL_PASSWORD", ""))
+
+            # Then apply toggle state (this makes lineEdits enabled/disabled + opacity)
+            update_networkdatabase_toggle(self.ui)
+
+        except Exception as e:
+            print(f"Error loading NetworkedDatabaseSettings to UI: {e}")
+
+    #load anglecalculationetting to ui
+    def load_AngleCalculationSettings_to_ui(self):
+        try:
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            # Load dict if not already loaded
+            if not hasattr(self.ui.valueObj, 'AngleCalculationSettings_dict') or not self.ui.valueObj.AngleCalculationSettings_dict:
+                self.ui.valueObj.AngleCalculationSettings_dict = self.ui.databaseObj.load_data_to_AngleCalculationSettings_dict(str(default_programId))
+
+            data = self.ui.valueObj.AngleCalculationSettings_dict
+            #print("angle_calculation database :",data)
+            # Helper to safely convert values to string for QLineEdit
+            def to_str(value, default=""):
+                if value is None:
+                    return default
+                return str(value)  
+            
+            #print("loaded angle db settings :",data)
+            
+            # Load values into UI (always show last saved data)
+            self.ui.lineEdit_angleDegree.setText(to_str(data.get("MASTER_ANGLE_DEGREES")))
+            self.ui.lineEdit_angleMinutes.setText(to_str(data.get("MASTER_ANGLE_MINUTES")))
+            self.ui.lineEdit_angleSeconds.setText(to_str(data.get("MASTER_ANGLE_SECONDS")))
+            self.ui.lineEdit_toleranceMin.setText(to_str(data.get("PLUS_TOLERANCE_MINUTES")))
+            self.ui.lineEdit_toleranceSec.setText(to_str(data.get("PLUS_TOLERANCE_SECONDS")))
+            self.ui.lineEdit_negativeTolMin.setText(to_str(data.get("MINUS_TOLERANCE_MINUTES")))
+            self.ui.lineEdit_negativeTolSec.setText(to_str(data.get("MINUS_TOLERANCE_SECONDS")))
+            self.ui.lineEdit_distanceMm.setText(to_str(data.get("DISTANCE")))
+
+            if data.get("ANGLETYPE") == 'Half Angle':
+                self.ui.radioButton_halfAngle.setChecked(True)
+                self.ui.radioButton_2_fullAngle.setChecked(False)
+            elif data.get("ANGLETYPE") == 'Full Angle':
+                self.ui.radioButton_2_fullAngle.setChecked(True)
+                self.ui.radioButton_halfAngle.setChecked(False)
+
+            # After loading values, update toggle state (handles enabling/disabling)
+            update_angle_toggle(self.ui)
+
+        except Exception as e:
+            print(f"Error loading AngleCalculationSettings to UI: {e}")
+
+    def load_AocSettings_to_ui(self):
+        try:
+            if not hasattr(self.ui.valueObj, 'AOCSettings_dict') or not self.ui.valueObj.AOCSettings_dict:
+                self.ui.valueObj.AOCSettings_dict = self.ui.databaseObj.load_data_to_AOCSettings_dict()
+
+            aoc_dict = self.ui.valueObj.AOCSettings_dict or {}
+            state = str(aoc_dict.get("AOC_ON_OFF", "OFF")).upper()
+            if state not in {"ON", "OFF"}:
+                state = "OFF"
+                # self.ui.radioButton_aocEnableOFF.setChecked(True)
+
+            self.ui.valueObj.AOCSettings_dict["AOC_ON_OFF"] = state
+            self.ui.valueObj.AOCSettings_dict["SPC_DATA_COUNT"] = aoc_dict.get("SPC_DATA_COUNT", "50")
+            self.ui.valueObj.activeVariables_dict["AOCOnOff"] = state
+
+            self.ui.lineEdit_spcDataCount.setText(str(aoc_dict.get("SPC_DATA_COUNT", "50")))
+            update_autooffcet_toggle(self.ui)
+        except Exception as e:
+            print(f"Error loading AOCSettings to UI: {e}")
+    def safe_int(self,value, default=0):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+    
+    def safe_float(self,value, default=0.0):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+    # -------- SAVE --------
+    def save_toDatabase_programSetting(self):
+        try:
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            # ensure comboBox has this program as text
+            if self.ui.comboBox_programId.findText(str(default_programId)) == -1:
+                self.ui.comboBox_programId.addItem(str(default_programId))
+
+            # set it as the current selection
+            self.ui.comboBox_programId.setCurrentText(str(default_programId))
+
+            # now when you read, it will not be blank
+            programId = int(self.ui.comboBox_programId.currentText())
+            programName = self.ui.lineEdit_programNameSettings.text()
+            durationForAutosave = float(self.ui.lineEdit_DurationAutosave.text())
+            Responsiveness = int(self.ui.lineEdit_Responsiveness.text())
+
+            mode = ""
+            uom = ""
+            if self.ui.radioButton_modeCombine.isChecked():
+                mode = "Combine"
+            elif self.ui.radioButton_modeIndividual.isChecked():
+                mode = "Individual"
+            else:
+                raise ValueError("Program mode not selected.")
+
+            if self.ui.radioButton_inch.isChecked():
+                uom = "inch"
+            elif self.ui.radioButton_mm.isChecked():
+                uom = "mm"
+            else:
+                raise ValueError("Unit of measurement not selected.")
+
+            self.ui.databaseObj.upsert_program_settings(programId,programName,mode,
+                                                    uom,durationForAutosave,Responsiveness)
+            with SessionLocal() as session:
+                try:
+
+                    active_program = session.query(ActiveVariables).filter_by(
+                        Key="ActiveProgramId"
+                    ).first()
+
+                    if active_program:
+                        active_program.Value = str(programId)
+
+                    session.commit()
+
+                except Exception as e:
+                    print(f"Error updating ActiveProgramId: {e}")
+            # print("ProgramSetting settings saved successfully.")
+            msg = CustomMessageBox("Program settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            QTimer.singleShot(0, self.probe_setttings_saved.emit)
+            self.ui.status_manager.show(
+                page_index=26,
+                message="Program Settings Loaded Successfully.",
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving program settings: {e}")
+            msg = CustomMessageBox("Failed to save program settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=26,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+            
+
+    def save_toDatabase_probeBasedSettings(self):
+        try:
+            self.probe_save_error = False
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            # ensure comboBox has this program as text
+            if self.ui.comboBox_programId.findText(str(default_programId)) == -1:
+                self.ui.comboBox_programId.addItem(str(default_programId))
+            
+
+            # set it as the current selection
+            self.ui.comboBox_programId.setCurrentText(str(default_programId))
+
+            # now when you read, it will not be blank
+            programId = int(self.ui.comboBox_programId.currentText())
+            programName = self.ui.lineEdit_programNameSettings.text()
+            DimensionName = self.ui.lineEdit_dimensionName.text()
+            #programId = self.ui.valueObj.activeVariables_dict['ActiveProgramId']
+            dimension = self.ui.comboBox_toselectProbe.currentText()
+            formulaBar = self.ui.label_formulaBar.text()
+            masterType = self.ui.comboBox_masterType.currentText()
+            # uol = float(self.ui.lineEdit_upperOffcetLimit.text())
+            usl = float(self.ui.lineEdit_usl.text())
+            ucl = float(self.ui.lineEdit_ucl.text())
+            nominal = float(self.ui.lineEdit_nominalValue.text())
+            lcl = float(self.ui.lineEdit_lcl.text())
+            lsl = float(self.ui.lineEdit_lsl.text())
+            # lol = float(self.ui.lineEdit_lowerOffsetLimit.text())
+            ovality = self.ui.comboBox_ovalityOnOff.currentText()
+            range_val = float(self.ui.comboBox_rangeProbe.currentText())
+            method = self.ui.comboBox_methodProbe.currentText()
+            LeastCount = float(self.ui.lineEdit_leastCount.currentText())
+            probe_sensitivity = int(self.ui.lineEdit_probeSensitivity.text())
+            air_sensitivity_quotient = self.ui.lineEdit_airSensitivityQuotient.text()
+            if(masterType == "Single Master"):
+                masterLower = 0.0
+                master = float(self.ui.lineEdit_master.text())
+                masterHigher = 0.0
+            elif(masterType == "Double Master"):
+                masterLower = float(self.ui.lineEdit_masterLower.text())
+                master = 0.0
+                masterHigher = float(self.ui.lineEdit_masterHigher.text())
+            else:
+                masterLower = 0.0
+                master = 0.0
+                masterHigher = 0.0
+                
+            if(ovality == 'OFF'):
+                case = None
+                caseT = None
+            else:
+                case = self.ui.comboBox_caseProbe.currentText()
+                caseT = float(self.ui.lineEdit_caseT.text())
+            self.ui.databaseObj.upsert_probe_based_settings(
+                program_id = programId,
+                ProgramName = programName,
+                dimension = dimension,
+                dimensionName = DimensionName,
+                formula = formulaBar ,
+                master_type = masterType ,
+                master_lower = masterLower ,
+                master = master ,
+                master_higher = masterHigher ,
+                # upper_offset_limit = uol ,
+                upper_specification_limit = usl ,
+                upper_control_limit = ucl ,
+                nominal_value = nominal ,
+                lower_control_limit = lcl ,
+                lower_specification_limit = lsl ,
+                # lower_offset_limit = lol ,
+                ovality = ovality ,
+                range_val = range_val ,
+                method = method ,
+                case = case ,
+                case_t = caseT ,
+                LeastCount=LeastCount,
+                probe_sensitivity = probe_sensitivity ,
+                air_sensitivity_quotient = air_sensitivity_quotient
+            )
+            with SessionLocal() as session:
+                try:
+
+                    active_program = session.query(ActiveVariables).filter_by(
+                        Key="ActiveProgramId"
+                    ).first()
+
+                    if active_program:
+                        active_program.Value = str(programId)
+
+                    session.commit()
+
+                except Exception as e:
+                    print(f"Error updating ActiveProgramId: {e}")
+            
+            msg = CustomMessageBox("Probe-based settings saved successfully.", "success",
+                                   parent=self.ui)        
+            msg.exec_()
+            QTimer.singleShot(0, self.probe_setttings_saved.emit)
+            dim_no = int(dimension[1])   # D2 -> 2
+
+            loaded_dims = [f"D{i}" for i in range(1, dim_no + 1)]
+
+            msg = f"{', '.join(loaded_dims)} data loaded successfully"
+
+            self.ui.status_manager.show(
+                page_index=30,
+                message=msg,
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving probe based settings: {e}")
+            self.probe_save_error = True
+            msg = CustomMessageBox("Failed to save probe based settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=30,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+    
+    def save_toDatabase_aocBasedSettings(self):
+        try:
+            self.probe_save_error = True
+            current = self.ui.valueObj.AOCSettings_dict['AOC_ON_OFF']
+            if(current == "OFF"):
+                return
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            # ensure comboBox has this program as text
+            if self.ui.comboBox_programId.findText(str(default_programId)) == -1:
+                self.ui.comboBox_programId.addItem(str(default_programId))
+
+            # set it as the current selection
+            self.ui.comboBox_programId.setCurrentText(str(default_programId))
+
+            # now when you read, it will not be blank
+            programId = self.safe_int(self.ui.comboBox_programId.currentText())
+            #programId = self.ui.valueObj.activeVariables_dict['ActiveProgramId']
+            dimension = self.ui.comboBox_toselectProbe.currentText()
+            if self.ui.radioButton_aocEnableOn.isChecked():
+                aocEnable = "ON"
+            elif self.ui.radioButton_aocEnableOFF.isChecked():
+                aocEnable = "OFF"
+            axis = self.ui.comboBox_axis.currentText()
+            offset = self.safe_int(self.ui.lineEdit_offsetNo.text())
+            uol = self.safe_float(self.ui.lineEdit_upperOffcetLimit.text())
+            lol = self.safe_float(self.ui.lineEdit_lowerOffsetLimit.text())
+            machine = self.ui.comboBox_machine.currentText()
+            direction = self.ui.comboBox_direction.currentText()
+            turretNo = self.safe_int(self.ui.lineEdit_turretNo.text())
+            workInProcess = self.safe_int(self.ui.lineEdit_workInProcess.text())
+            skipoffsetCount = self.safe_int(self.ui.lineEdit_skipOffsetCount.text())
+            self.ui.databaseObj.upsert_aoc_based_settings(
+                program_id = programId,
+                dimension = dimension,
+                aocEnable = aocEnable,
+                axis = axis,
+                offset_no = offset,
+                upper_offset_limit = uol,
+                lower_offset_limit = lol,
+                machine = machine,
+                direction = direction,
+                turret_no = turretNo,
+                work_in_process = workInProcess,
+                skipoffsetCount = skipoffsetCount
+            )
+            QTimer.singleShot(
+                0,
+                lambda: self.update_aoc_dimension_combobox(programId)
+            )
+            #print("aocBased settings saved successfully.")
+            msg = CustomMessageBox("AOC-based settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            QTimer.singleShot(0, self.probe_setttings_saved.emit)
+            # 🔔 notify CNCManager that AOC settings changed for this program+dimension
+            self.aoc_settings_saved.emit(programId, dimension)
+            dim_no = int(dimension[1])   # D2 -> 2
+
+            loaded_dims = [f"D{i}" for i in range(1, dim_no + 1)]
+
+            msg = f"{', '.join(loaded_dims)} data loaded successfully"
+
+            self.ui.status_manager.show(
+                page_index=30,
+                message=msg,
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving AOC based settings: {e}")
+            self.probe_save_error = True
+            msg = CustomMessageBox("Failed to save AOC based settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=30,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+
+    def save_toDatabase_IOSettings(self):
+        try:
+            io_settings_dict = getattr(self.ui.valueObj, 'IOSettings_dict', {}) or {}
+            
+            buzzer_enable = io_settings_dict.get('BUZZER', {}).get('Enable', '0')
+            relay_enable = io_settings_dict.get('RELAY', {}).get('Enable', '0')
+            cycleStopTimer_enable = io_settings_dict.get('CYCLE_STOP_TIMER', {}).get('Enable', '0')
+            autoSaveReading_enable = io_settings_dict.get('AUTO_SAVE_READING', {}).get('Enable', '0')
+            partTraceabilty_enable = io_settings_dict.get('PART_TRACEABILITY', {}).get('Enable', '0')
+            timetoMasterSet_enable = io_settings_dict.get('TIME_TO_MASTER_SET', {}).get('Enable', '0')
+            masterGrouping_enable = io_settings_dict.get('MASTER_GROUPING', {}).get('Enable', '0')
+            savemastercalibration_enable = io_settings_dict.get('SAVE_MASTER_CALIBRATION', {}).get('Enable', 'OFF')
+
+            # Assuming these line edits hold the 'Value' part of the tuple
+            relay_value = self.ui.lineEdit_relayTime.text()
+            cycleStopTimer_value = self.ui.lineEdit_cycleTime.text()
+            timetoMasterSet_value = self.ui.lineEdit_timeToMasterSet.text()
+
+            # Determine buzzer value based on radio buttons
+            buzzer_value = ""
+            if self.ui.radioButton_okBuzzer.isChecked():
+                buzzer_value = "Ok"
+            elif self.ui.radioButton_reworkNotokBuzzer.isChecked():
+                buzzer_value = "Rework / Not Ok"
+            else:
+                raise ValueError("Buzzer value not selected.")
+            
+            # Determine part traceability value based on radio buttons
+            partTraceabilty_value = ""
+            if self.ui.radioButton_manualPartTraceability.isChecked():
+                partTraceabilty_value = "Manual Reset"
+            elif self.ui.radioButton_autoPartTraceability.isChecked():
+                partTraceabilty_value = "Auto Reset"
+            else:
+                raise ValueError("Part traceability value not selected.")
+            
+            # if self.ui.radioButton_saveMasterDbON.isChecked():
+            #     savemastercalibration_enable = "ON"
+
+            # elif self.ui.radioButton_saveMasterDbOFF.isChecked():
+            #     savemastercalibration_enable = "OFF"
+
+            # else:
+            #     savemastercalibration_enable = "OFF"  # Default to OFF if not selected  
+                
+            self.ui.databaseObj.update_io_settings(
+                (buzzer_enable, buzzer_value),
+                (relay_enable, relay_value),
+                (cycleStopTimer_enable, cycleStopTimer_value),
+                (autoSaveReading_enable, None), # Assuming autoSaveReading doesn't have a specific value field
+                (partTraceabilty_enable, partTraceabilty_value),
+                (savemastercalibration_enable, None),
+                (timetoMasterSet_enable, timetoMasterSet_value),
+                (masterGrouping_enable, None) # Assuming masterGrouping doesn't have a specific value field
+            )
+            self.ui.valueObj.IOSettings_dict = self.ui.databaseObj.load_data_to_IOSettings_dict()
+            self.ui.valueObj.activeVariables_dict["BUZZER"] = buzzer_enable
+            self.ui.valueObj.activeVariables_dict["RELAY"] = relay_enable
+            self.ui.valueObj.activeVariables_dict["CYCLE_STOP_TIMER"] = cycleStopTimer_enable
+            self.ui.valueObj.activeVariables_dict["AUTO_SAVE_READING"] = autoSaveReading_enable
+            self.ui.valueObj.activeVariables_dict["PART_TRACEABILITY"] = partTraceabilty_enable
+            self.ui.valueObj.activeVariables_dict["SAVE_MASTER_CALIBRATION"] = savemastercalibration_enable
+            self.ui.valueObj.activeVariables_dict["TIME_TO_MASTER_SET"] = timetoMasterSet_enable
+            self.ui.valueObj.activeVariables_dict["MASTER_GROUPING"] = masterGrouping_enable
+            
+            self.ui.dial_indicator.set_visibility()
+            #print("Iosettings settings saved successfully.")
+            msg = CustomMessageBox("I/O settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            
+            self.io_settings_saved.emit()  # 🔔 emit AFTER save
+            self.ui.status_manager.show(
+                page_index=8,
+                message="I/O Setting Loaded Successfully.",
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving IO settings: {e}")
+            msg = CustomMessageBox("Failed to save IO settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=8,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+
+    def save_toDatabase_IpSettings(self):
+        try:
+            ip = self.ui.lineEdit_selfIp.text()
+            subnetmask = self.ui.lineEdit_subnetMask.text()
+            gateway = self.ui.lineEdit_defaultGateway.text()
+
+            self.ui.databaseObj.upsert_ip_settings(ip,subnetmask,gateway)
+            self.ui.valueObj.IPSettings_dict = self.ui.databaseObj.load_data_to_IPSettings_dict()
+            self.ui.utils.apply_static_ip(ip,subnetmask,gateway)
+            #print("Ip Setting saved successfully.")
+            msg = CustomMessageBox("IP settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=5,
+                message="IP Settings Loaded Successfully.",
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving IP settings: {e}")
+            msg = CustomMessageBox("Failed to save IP settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=5,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+
+    def save_toDatabase_WifiSettings(self):
+        try:
+            ssid = self.ui.lineEdit_wifiSsid.text()
+            password = self.ui.lineEdit_wifiPassword.text()
+
+            # Call your database handler
+            self.ui.utils.Wifi_Settings(ssid,password) # connect to wifi
+            self.ui.databaseObj.upsert_wifi_settings(ssid, password) #to share ui text on db
+            self.ui.valueObj.WifiSettings_dict = self.ui.databaseObj.load_data_to_WifiSettings_dict()
+
+            #print("WiFi settings saved successfully.")
+            msg = CustomMessageBox("WiFi settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=6,
+                message="Wifi Data loaded Successfully.",
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving WiFi settings: {e}")
+            msg = CustomMessageBox("Failed to save WiFi settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=6,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+
+    def save_toDatabase_rs232Settings(self):
+        try:
+            rs232OnOff = self.ui.valueObj.activeVariables_dict.get('RS232OnOff','OFF')
+            baudrate = self.ui.comboBox_baudRate.currentText()
+            dataBits = self.ui.comboBox_dataBits.currentText()
+            parity = self.ui.comboBox_parity.currentText()
+            stopBits = self.ui.comboBox_stopBits.currentText()
+            flowControl = self.ui.comboBox_flowControl.currentText()
+            portName = self.ui.lineEdit_portName.text()
+
+            self.ui.databaseObj.update_rs232_settings(rs232OnOff,baudrate,dataBits,parity,stopBits,flowControl,portName)
+            self.ui.valueObj.RS232Settings_dict = self.ui.databaseObj.load_data_to_RS232Settings_dict()
+            
+            # Also update activeVariables_dict for consistency
+            self.ui.valueObj.activeVariables_dict["RS232OnOff"] = rs232OnOff
+            
+            #print("rs232 settings saved successfully.")
+            msg = CustomMessageBox("RS232 settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            # QTimer.singleShot(0,self.Rs232_settings_saved.emit())
+            self.Rs232_settings_saved.emit()
+            self.ui.status_manager.show(
+                page_index=3,
+                message="RS232 Data Loaded Successfully.",
+                timeout=6000,
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving RS232 settings: {e}")
+            msg = CustomMessageBox("Failed to save RS232 settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=3,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+        
+
+    def save_toDatabase_networkedDatabase_settings(self):
+        try:
+                networkBasedDatabaseOnOFF = self.ui.valueObj.activeVariables_dict.get('NetworkedDatabaseSettingsOnOff','OFF')
+                msSqlDriverName = self.ui.lineEdit_driverNameDb.text()
+                msSqlServerName = self.ui.lineEdit_serverNameDb.text()
+                msSqlDatabaseNme = self.ui.lineEdit_databaseNameDb.text()
+                msSqlUserName = self.ui.lineEdit_usernameDb.text()
+                msSqlPassword = self.ui.lineEdit_passwordDb.text()
+
+                self.ui.databaseObj.update_networked_database_settings(networkBasedDatabaseOnOFF,msSqlDriverName,
+                                                                    msSqlServerName,msSqlDatabaseNme,
+                                                                    msSqlUserName,msSqlPassword)
+                self.ui.valueObj.NetworkedDatabaseSettings_dict = self.ui.databaseObj.load_data_to_NetworkedDatabaseSettings_dict()
+                
+                self.ui.valueObj.activeVariables_dict["NetworkedDatabaseSettingsOnOff"] = networkBasedDatabaseOnOFF
+
+                #print("networkdatabase settings saved successfully.")
+                msg = CustomMessageBox("Networked database settings saved successfully.", "success",
+                                       parent=self.ui)
+                msg.exec_()
+                self.ui.status_manager.show(
+                    page_index=16,
+                    message="DataBase Loaded Successfully.",
+                    timeout=6000,
+                    msg_type="success"
+                )
+            
+        except Exception as e:
+            print(f"Error saving networked database settings: {e}")
+            msg = CustomMessageBox("Failed to save networked database settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                page_index=16,
+                message="Please check inputs and try again.",
+                timeout=6000,
+                msg_type="error"
+            )
+
+    def save_toDatabase_angleCalculationSettings(self):
+        try:
+            default_programId = self.ui.valueObj.activeVariables_dict.get('ActiveProgramId', 1)
+            # ensure comboBox has this program as text
+            if self.ui.comboBox_programId.findText(str(default_programId)) == -1:
+                self.ui.comboBox_programId.addItem(str(default_programId))
+
+            # set it as the current selection
+            self.ui.comboBox_programId.setCurrentText(str(default_programId))
+            # now when you read, it will not be blank
+            programId = self.safe_int(self.ui.comboBox_programId.currentText())
+            #programId = self.ui.comboBox_programIdSetting_outer.currentText()
+            angleCalculationOnOff = self.ui.valueObj.activeVariables_dict.get('AngleCalculationOnOff','OFF')
+            angleDegree = self.safe_int(self.ui.lineEdit_angleDegree.text())
+            angleMin = self.safe_int(self.ui.lineEdit_angleMinutes.text())
+            angleSec = self.safe_int(self.ui.lineEdit_angleSeconds.text())
+            tolaranceMin = self.safe_int(self.ui.lineEdit_toleranceMin.text())
+            tolaranceSec = self.safe_int(self.ui.lineEdit_toleranceSec.text())
+            negativeTolMin = self.safe_int(self.ui.lineEdit_negativeTolMin.text())
+            negativeTolSec = self.safe_int(self.ui.lineEdit_negativeTolSec.text())
+            distance = self.safe_float(self.ui.lineEdit_distanceMm.text())
+            angleType = ""
+            if self.ui.radioButton_2_fullAngle.isChecked():
+                angleType = "Full Angle"  # or whatever string you store in DB
+            elif self.ui.radioButton_halfAngle.isChecked():
+                angleType = "Half Angle"
+            else:
+                raise ValueError("Angle type not selected.")
+
+            self.ui.databaseObj.upsert_angle_calculation_settings(programId,angleCalculationOnOff,angleDegree,angleMin,
+                                                                angleSec,tolaranceMin,tolaranceSec,
+                                                                negativeTolMin,negativeTolSec,distance,angleType)
+            # Reload latest DB values into dictionary
+            self.ui.valueObj.AngleCalculationSettings_dict = self.ui.databaseObj.load_data_to_AngleCalculationSettings_dict(programId)
+            
+            self.ui.valueObj.activeVariables_dict["AngleCalculationOnOff"] = angleCalculationOnOff
+
+            #print("angleCalculation settings saved successfully.")
+            msg = CustomMessageBox("Angle calculation settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                    page_index=27,
+                    message="Angle Calcultaion data Loaded Successfully.",
+                    timeout=6000,
+                    msg_type="success"
+                )
+        except Exception as e:
+            print(f"Error saving angle calculation settings: {e}")
+            msg = CustomMessageBox("Failed to save angle calculation settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                    page_index=27,
+                    message="Please check inputs and try again.",
+                    timeout=6000,
+                    msg_type="error"
+                )
+
+    def save_toDatabase_cncList(self):
+        try:
+            cncName = self.ui.lineEdit_cncName.text().strip()
+            ipAddress = self.ui.lineEdit_cncIpAddress.text().strip()
+            portNumber = self.ui.lineEdit_cncPortNumber.text().strip()
+            cncSelection = self.ui.comboBox_cncSelectionType.currentText()
+            controller = self.ui.comboBox_cncController.currentText()
+            trial_mode = self.ui.comboBox_trialMode.currentText()
+
+            # Get CNC modify state
+            cnc_table = self.ui.cncListDisplay
+
+            cnc_id = (
+                cnc_table.selected_cnc_id
+                if cnc_table.is_modify_mode
+                else None
+            )
+
+            print("CNC SAVE DEBUG")
+            print("Modify mode:", cnc_table.is_modify_mode)
+            print("Selected CNC ID:", cnc_id)
+
+            result = self.ui.databaseObj.upsert_cnc_list(
+                cnc_id,
+                cncName,
+                ipAddress,
+                portNumber,
+                cncSelection,
+                controller,
+                trial_mode
+            )
+
+            if result == "added":
+                msg_text = "CNC Machine Data added successfully."
+
+            elif result == "updated":
+                msg_text = "CNC Machine Data updated successfully."
+
+            elif result == "duplicate":
+                msg = CustomMessageBox(
+                    "CNC name already exists!",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            elif result == "not_found":
+                msg = CustomMessageBox(
+                    "CNC record not found!",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            else:
+                msg = CustomMessageBox(
+                    "Failed to save CNC Machine Data.",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            # Refresh table
+            cnc_table.load_cnc_data_to_table()
+
+            # Reset modify state
+            cnc_table.selected_cnc_id = None
+            cnc_table.is_modify_mode = False
+
+            msg = CustomMessageBox(
+                msg_text,
+                "success",
+                parent=self.ui
+            )
+            msg.exec_()
+
+            self.ui.status_manager.show(
+                page_index=13,
+                message=msg_text,
+                timeout=6000,
+                msg_type="success"
+            )
+
+        except Exception as e:
+            print(f"Error saving CNC Machine Data: {e}")
+
+            msg = CustomMessageBox(
+                "Failed to save CNC Machine Data. Please check inputs and try again.",
+                "error",
+                parent=self.ui
+            )
+            msg.exec_()
+
+    def save_toDatabase_aocSettings(self):
+        try:
+            aocOnOff = self.ui.valueObj.activeVariables_dict.get('AOCOnOff',"OFF")
+            spcDataCount = self.ui.lineEdit_spcDataCount.text()
+            self.ui.databaseObj.update_aoc_settings(aocOnOff,spcDataCount)
+            self.ui.valueObj.activeVariables_dict["AOCOnOff"] = aocOnOff
+            self.ui.valueObj.AOCSettings_dict["AOC_ON_OFF"] = aocOnOff
+            self.ui.valueObj.AOCSettings_dict["SPC_DATA_COUNT"] = spcDataCount
+            if hasattr(self.ui, "cnc_manager"):
+                self.ui.cnc_manager.update_aoc_thread_state()
+            self.load_AocSettings_to_ui()
+            
+            #print("aoc settings saved successfully.")
+            msg = CustomMessageBox("AOC settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.set_fixed_message(
+                14,
+                "Aoc data loaded successfully.",
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error saving AOC settings: {e}")
+            msg = CustomMessageBox("Failed to save AOC settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+            self.ui.status_manager.show(
+                    page_index=18,
+                    message="Please check inputs and try again.",
+                    timeout=6000,
+                    msg_type="error"
+                )
+            
+
+    def save_toDatabase_userManagement(self):
+        try:
+            setUsername = self.ui.lineEdit_setUsernameLogin.text().strip()
+            setPassword = self.ui.lineEdit_setPasswordLogin.text().strip()
+            setAccessType = self.ui.comboBox_setAccessCombo.currentText()
+
+            # Get the UserTableDisplay object
+            user_table = self.ui.user_managementTable
+
+            # Get user ID correctly
+            user_id = (
+                user_table.selected_user_id
+                if user_table.is_modify_mode
+                else None
+            )
+
+            result = self.ui.databaseObj.upsert_user_management(
+                user_id,
+                setUsername,
+                setPassword,
+                setAccessType
+            )
+
+            print("Database result:", result)
+
+            if result == "added":
+                msg_text = "User added successfully"
+
+            elif result == "updated":
+                msg_text = "User updated successfully"
+
+            elif result == "duplicate":
+                msg = CustomMessageBox(
+                    "Username already exists!",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            elif result == "not_found":
+                msg = CustomMessageBox(
+                    "User not found!",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            else:
+                msg = CustomMessageBox(
+                    "Database error occurred",
+                    "error",
+                    parent=self.ui
+                )
+                msg.exec_()
+                return
+
+            # Refresh table
+            user_table.load_users_to_table()
+
+            # Reset modify state
+            user_table.selected_user_id = None
+            user_table.is_modify_mode = False
+
+            msg = CustomMessageBox(
+                msg_text,
+                "success",
+                parent=self.ui
+            )
+            msg.exec_()
+
+            self.ui.status_manager.show(
+                page_index=2,
+                message=msg_text,
+                timeout=6000
+            )
+
+        except Exception as e:
+            print(f"Error saving/updating user: {e}")
+
+            msg = CustomMessageBox(
+                "Failed to save user",
+                "error",
+                parent=self.ui
+            )
+            msg.exec_()
+    def save_toDatabase_shiftSettings(self):
+        try:
+            shift1 = (self.ui.lineEdit_shift1FromTime.text(),
+                     self.ui.lineEdit_shift1ToTime.text())
+            shift2 = (self.ui.lineEdit_shift2FromTime.text(),
+                      self.ui.lineEdit_shift2ToTime.text())
+            shift3 = (self.ui.lineEdit_shift3FromTime.text(),
+                      self.ui.lineEdit_shift3ToTime.text())
+
+            # Call DB function
+            self.ui.databaseObj.upsert_shift_timings(shift1, shift2, shift3)
+            #print("Shift settings saved")
+            msg = CustomMessageBox("Shift settings saved successfully.", "success",
+                                   parent=self.ui)
+            msg.exec_()
+        except Exception as e:
+            print(f"Error saving shift settings: {e}")
+            msg = CustomMessageBox("Failed to save shift settings. Please check inputs and try again.", "error",
+                                   parent=self.ui)
+            msg.exec_()
+
+    # -------- HELPERS --------
+    def clear_master_values_ui(self):
+        try:
+            for labels in self.master_value_labels.values():
+                labels["high"].clear()
+                labels["low"].clear()
+        except Exception as e:
+            print(f"Error in clear master value ui {e}")        
+    
+    # -------- UI STATE --------
+    def Hide_rows(self):
+        try:
+            for row_labels in self.master_rows.values():
+                for lbl in row_labels:
+                    lbl.hide()
+        except Exception as e:
+            print(f"Error in hide_rows : {e}")
+                        
+    def load_Higher_lower_value_to_ui(self, program_id):
+        try:
+            # ✅ CLEAR OLD PROGRAM VALUES FIRST
+            self.clear_master_values_ui()
+            self.Hide_rows()
+            with self.ui.databaseObj.SessionLocal() as session:
+                probes = (
+                    session.query(ProbeBasedSettings)
+                    .filter(ProbeBasedSettings.ProgramId == program_id)
+                    .all()
+                )
+
+                # print("Loaded probes from DB:", len(probes))
+
+                for probe in probes:
+                    dim = str(probe.Dimension).strip().upper()
+
+                    if dim not in self.master_value_labels:
+                        # print("⚠️ No label mapping for", dim)
+                        continue
+
+                    labels = self.master_value_labels[dim]
+                    for lbl in self.master_rows[dim]:
+                        lbl.show()
+
+
+                    lbl_high = labels["high"]
+                    lbl_low  = labels["low"]
+
+                    lbl_high.setText("" if probe.MasterHigher is None else str(probe.MasterHigher))
+                    lbl_low.setText("" if probe.MasterLower is None else str(probe.MasterLower))
+        except Exception as e:
+            print(f"Error in load_higher_lower_value in ui): {e}")
+
+
+    def get_dimension_list_for_combobox(self):
+        try:
+            # 1️⃣ Collect saved dimensions from DB
+            saved_dims = sorted(
+                [
+                    dim for dim in self.ui.valueObj.ProgramSettings_dict.keys()
+                    if dim.startswith("D")
+                ],
+                key=lambda x: int(x[1:])
+            )
+
+            # 2️⃣ If nothing saved → start with D1
+            if not saved_dims:
+                return ["D1"]
+
+            # 3️⃣ Find highest saved dimension
+            last_dim_num = int(saved_dims[-1][1:])
+
+            # 4️⃣ Allow one extra dimension (max D8)
+            if last_dim_num < 8:
+                return saved_dims + [f"D{last_dim_num + 1}"]
+
+            return saved_dims
+        except Exception as e:
+            print(f"Error in get dimension list for combobox {e}")
+    
+    def update_dimension_combobox(self, keep_dimension=None):
+        try:
+            dims = self.get_dimension_list_for_combobox()
+
+            self.ui.comboBox_toselectProbe.blockSignals(True)
+            self.ui.comboBox_toselectProbe.clear()
+            self.ui.comboBox_toselectProbe.addItems(dims)
+
+            if keep_dimension in dims:
+                self.ui.comboBox_toselectProbe.setCurrentText(keep_dimension)
+            else:
+                self.ui.comboBox_toselectProbe.setCurrentIndex(0)
+
+            self.ui.comboBox_toselectProbe.blockSignals(False)
+        except Exception as e:
+            print(f"Error in update dimension combobox {e}")
+    
+    def build_probe_unique_string(self, dimension, probe_settings):
+        #To build Probe Unique String including dimension and probe_settings.
+        try:
+            ps = self.ui.valueObj.ProgramSettings_dict.get('ProgramSpecificSettings', {})
+
+            values = [
+                ps.get("ProgramId"),
+                ps.get("ProgramName"),
+                dimension,
+                probe_settings.get("DimensionName"),
+                probe_settings.get("Formula"),
+                probe_settings.get("UpperSpecificationLimit"),
+                probe_settings.get("UpperControlLimit"),
+                probe_settings.get("NominalValue"),
+                probe_settings.get("LowerControlLimit"),
+                probe_settings.get("LowerSpecificationLimit"),
+                ps.get("Uom"),
+                probe_settings.get("Ovality"),
+                probe_settings.get("Method"),
+                probe_settings.get("Case"),
+                probe_settings.get("CaseT")
+            ]
+
+            return ",".join(map(str, values))
+        except Exception as e:
+            print(f"Error while building a unique probe string")
+    def build_aoc_unique_string(self, dimension, aoc_settings):
+            #To build Probe Unique String including dimension and probe_settings.
+            try:
+                ps = self.ui.valueObj.ProgramSettings_dict.get('ProgramSpecificSettings', {})
+    
+                values = [
+                    ps.get("ProgramId"),
+                    ps.get("ProgramName"),
+                    dimension,
+                    aoc_settings.get("Axis"),
+                    aoc_settings.get("OffsetNo"),
+                    aoc_settings.get("UpperOffsetLimit"),
+                    aoc_settings.get("LowerOffsetLimit"),
+                    aoc_settings.get("Machine"),
+                    aoc_settings.get("Direction"),
+                    aoc_settings.get("TurretNo"),
+                    aoc_settings.get("WorkInProcess"),
+                    aoc_settings.get("SkipOffsetCount"),
+                ]
+    
+                return ",".join(map(str, values))
+            except Exception as e:
+                print(f"Error while building a unique probe string")
+                
+    def delete_AOCValue_as_per_dimension(self, program_id, dimension):
+        try:
+            session = self.ui.savedbObj.get_session()
+
+            try:
+                aoc_ids = []
+
+                # Use the model exposed by SaveDatabaseManager
+                rows = session.query(
+                    self.ui.savedbObj.AOCBasedIds
+                ).all()
+
+                for row in rows:
+                    try:
+                        prog = row.AOCUniqueSettings.split(",")[0].strip()
+
+                        if prog == str(program_id):
+                            aoc_ids.append(row.AOCId)
+
+                    except Exception:
+                        pass
+
+                # print(
+                #     f"[INFO] AOC IDs for Program {program_id}: {aoc_ids}"
+                # )
+
+                # Delete ONLY this program + this dimension
+                if aoc_ids:
+                    deleted_count = session.query(
+                        self.ui.savedbObj.AOCValues
+                    ).filter(
+                        self.ui.savedbObj.AOCValues.AOCBasedId.in_(aoc_ids),
+                        self.ui.savedbObj.AOCValues.Dimension == dimension
+                    ).delete(
+                        synchronize_session=False
+                    )
+
+                session.commit()
+
+                self.db_dimension_deleted.emit()
+
+            except Exception:
+                session.rollback()
+                raise
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            print(
+                f"Error in delete_AOCValue_as_per_dimension -> {e}"
+            )
+    def delete_dimension(self, program_id, dimension):
+        try:
+            with SessionLocal() as session:
+                try:
+                    # print(f"Deleting ProgramId={program_id}, Dimension={dimension}")
+                    # --------------------------------------------------
+                    # 1. Get AOC IDs for this program
+                    #    BEFORE deleting AOCBasedSettings
+                    # --------------------------------------------------
+                    session.query(ProbeBasedSettings).filter_by(
+                        ProgramId=program_id,
+                        Dimension=dimension
+                    ).delete()
+
+                    session.query(AOCBasedSettings).filter_by(
+                        ProgramId=program_id,
+                        Dimension=dimension
+                    ).delete()
+                    
+                    # Delete Set Master data
+                    session.query(SetMasterSettings).filter_by(
+                        ProgramId=program_id,
+                        Dimension=dimension
+                    ).delete()
+                    session.commit()
+                    self.db_dimension_deleted.emit()
+                except Exception as e:
+                    session.rollback()
+                    print(f"Error deleting dimension in DB: {e}")
+                    
+
+        except Exception as outer_error:
+            print(f"Session creation failed: {outer_error}")
+    def delete_aocValues_program(self,program_id):
+        try:
+            # --------------------------------------------------
+            # 1. Get AOC IDs for this program
+            #    BEFORE deleting AOCBasedSettings
+            # --------------------------------------------------
+            session = self.ui.savedbObj.get_session()
+
+            try:
+                aoc_ids = []
+
+                # Use the model exposed by SaveDatabaseManager
+                rows = session.query(
+                    self.ui.savedbObj.AOCBasedIds
+                ).all()
+
+                for row in rows:
+                    try:
+                        prog = row.AOCUniqueSettings.split(",")[0].strip()
+
+                        if prog == str(program_id):
+                            aoc_ids.append(row.AOCId)
+
+                    except Exception:
+                        pass
+
+                # Delete ONLY this program + this dimension
+                if aoc_ids:
+                    deleted_count = session.query(
+                        self.ui.savedbObj.AOCValues
+                        ).filter(
+                        self.ui.savedbObj.AOCValues.AOCBasedId.in_(aoc_ids),
+                        ).delete(
+                            synchronize_session=False
+                        )
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+            
+            finally:
+                session.close()    
+        except Exception as e:
+            print(f"Error in delete_aocValues_program -> {e} ")
+            
+    def delete_program(self, program_id):
+        """
+        Deletes entire program and all its related data safely.
+        """
+        try:
+            with SessionLocal() as session:
+                try:
+                    
+                    # 🔥 Delete all dimension-related data
+                    session.query(ProbeBasedSettings).filter(
+                        ProbeBasedSettings.ProgramId == program_id
+                    ).delete(synchronize_session=False)
+
+                    session.query(AOCBasedSettings).filter(
+                        AOCBasedSettings.ProgramId == program_id
+                    ).delete(synchronize_session=False)
+                    
+                    # 🔥 Delete program-level settings
+                    session.query(ProgramSettings).filter(
+                        ProgramSettings.ProgramId == program_id
+                    ).delete(synchronize_session=False)
+                    
+                    # 🔥 Delete angle calculation settings (used in your code)
+                    session.query(AngleCalculationSettings).filter(
+                        AngleCalculationSettings.ProgramId == program_id
+                    ).delete(synchronize_session=False)
+                    session.query(SetMasterSettings).filter(
+                        SetMasterSettings.ProgramId == program_id
+                    ).delete(synchronize_session=False)
+                    session.commit()
+                    print(f"[INFO] Program {program_id} deleted successfully")
+                except Exception as e:
+                    session.rollback()
+                    print(f"[ERROR] delete_program failed: {e}")
+
+        except Exception as outer_error:
+            print(f"[ERROR] Session creation failed: {outer_error}")
+        
+    def save_probe_unique_settings(self):
+        """
+        Save probe unique settings to ProbeBasedIds table.
+        Creates ProbeId if unique_string doesn't exist.
+        """
+        try:
+            programId = int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))
+            
+            # Reload latest settings
+            self.ui.valueObj.ProgramSettings_dict = \
+                self.ui.databaseObj.load_data_to_ProgramSettings_dict(programId)
+            
+            program_dict = self.ui.valueObj.ProgramSettings_dict
+
+            dims = [
+                key for key, val in program_dict.items()
+                if key.startswith("D") and val.get("ProbeBasedSettings")
+            ]
+
+            for dim in dims:
+                probe_settings = program_dict[dim]["ProbeBasedSettings"]
+                unique_string = self.build_probe_unique_string(dim, probe_settings)
+                
+                # print(f"Processing dimension {dim}: unique_string='{unique_string[:50]}...'")
+
+                # Get existing or create new ProbeId
+                probe_id = self.ui.savedbObj.get_probe_id_by_settings(unique_string)
+                if probe_id == 0:
+                    # print(f"Creating new ProbeBasedIds for {dim}")
+                    probe_id = self.ui.savedbObj.insert_probe_based_ids(unique_string)
+                    # print(f"New ProbeId {probe_id} created for {dim}")
+                else:
+                    print(f"Found existing ProbeId {probe_id} for {dim}")
+                
+                # Update dict with ProbeId
+                program_dict[dim]["ProbeBasedSettings"]["ProbeId"] = probe_id
+            
+            # print("✅ All probe unique settings processed successfully")
+            
+        except Exception as e:
+            print(f"❌ Error saving probe unique settings: {e}")
+            import traceback
+            traceback.print_exc()
+    def save_Aoc_unique_settings(self):
+            """
+            Save Aoc unique settings to AocBasedIds table.
+            Creates AocId if unique_string doesn't exist.
+ 
+            Builds the unique string directly from the AOCBasedSettings DB row
+            (not the in-memory ProgramSettings_dict cache) so this always matches
+            what CNCManager.process_reading_and_write_correction looks up — using
+            two different sources for the same string previously caused silent
+            lookup mismatches (AOCId never found even after insert).
+ 
+            Only processes dimensions where aocEnable == "ON", since only those
+            dimensions should ever get AOCBasedIds/AOCValues entries.
+            """
+            try:
+                programId = int(self.ui.valueObj.activeVariables_dict.get("ActiveProgramId", "1"))
+ 
+                session = SessionLocal()
+                try:
+                    aoc_rows = session.query(AOCBasedSettings).filter_by(
+                        ProgramId=programId
+                    ).all()
+                    # detach values we need before closing the session
+                    rows_data = [
+                        {
+                            "Dimension": row.Dimension,
+                            "aocEnable": (row.aocEnable or "").strip().upper(),
+                            "Axis": row.Axis,
+                            "OffsetNo": row.OffsetNo,
+                            "UpperOffsetLimit": row.UpperOffsetLimit,
+                            "LowerOffsetLimit": row.LowerOffsetLimit,
+                            "Machine": row.Machine,
+                            "Direction": row.Direction,
+                            "TurretNo": row.TurretNo,
+                            "WorkInProcess": row.WorkInProcess,
+                            "SkipOffsetCount": row.SkipOffsetCount,
+                        }
+                        for row in aoc_rows
+                    ]
+                finally:
+                    session.close()
+ 
+                for row_data in rows_data:
+                    if row_data["aocEnable"] != "ON":
+                        continue  # skip dimensions with AOC disabled
+ 
+                    dim = row_data["Dimension"]
+                    unique_string = self.build_aoc_unique_string(dim, row_data)
+ 
+                    aoc_id = self.ui.savedbObj.get_aoc_id_by_settings(unique_string)
+                    if aoc_id == 0:
+                        aoc_id = self.ui.savedbObj.insert_aoc_based_ids(unique_string)
+                        print(f"Created new AOCId {aoc_id} for {dim}")
+                    else:
+                        print(f"Found existing aocId {aoc_id} for {dim}")
+ 
+                    # keep in-memory dict in sync too, for anything else that reads it
+                    if dim in self.ui.valueObj.ProgramSettings_dict:
+                        self.ui.valueObj.ProgramSettings_dict[dim].setdefault(
+                            "AOCBasedSettings", {}
+                        )["AOCId"] = aoc_id
+ 
+            except Exception as e:
+                print(f"❌ Error saving aoc unique settings: {e}")
+                import traceback
+                traceback.print_exc()
+            
+# Recreate the RS232 serial handler from current DB settings
+    def regenerate_rs232_instance(self):
+        try:
+            """Regenerate SerialHandler: Always close old if exists, then recreate based on DB if 'ON'."""
+            # Close existing instance safely (calls __del__ or manual close)
+            if self.ui.serial_instance is not None:
+                try:
+                    self.ui.serial_instance.ser.close() if hasattr(self.ui.serial_instance, 'ser') and self.ui.serial_instance.ser.is_open else None
+                except Exception:
+                    pass
+                del self.ui.serial_instance
+
+            # Try to create new based on DB
+            try:
+                rs232_settings = self.ui.databaseObj.load_data_to_RS232Settings_dict()
+                if rs232_settings.get('RS232_ON_OFF', 'OFF') == 'ON':
+                    port = rs232_settings['PORT_NAME']
+                    baud_rate = int(rs232_settings['BAUD_RATE'])
+                    parity_map = {'None': 'N', 'Even': 'E', 'Odd': 'O'}
+                    parity = parity_map.get(rs232_settings.get('PARITY', 'None'), 'N')
+                    stopbits_map = {'One': 1, '1.5': 1.5, 'Two': 2}
+                    stopbits = stopbits_map.get(rs232_settings.get('STOP_BITS', 'One'), 1)
+                    data_bits = int(rs232_settings['DATA_BITS'])
+                    self.ui.serial_instance = SerialHandler(port, baud_rate, parity, stopbits, data_bits)
+                    # print(f"SerialHandler regenerated: {port} @ {baud_rate}")
+                else:
+                    self.ui.serial_instance = None
+                    # print("RS232 disabled (RS232_ON_OFF=OFF)")
+            except (KeyError, ValueError, RuntimeError) as e:
+                self.ui.serial_instance = None
+                # print(f"Failed to regenerate SerialHandler: {e}")
+            except Exception as e:
+                self.ui.serial_instance = None
+                print(f"Unexpected error regenerating SerialHandler: {e}")
+        except Exception as e:
+            print(f"Error regenerating RS232 instance: {e}")
+                
+    # Fetch available program IDs and names from ProgramSettings and ProbeBasedSettings
+    def get_program_list(self):
+        try:
+            with SessionLocal() as session:
+                try:
+                    # 1️⃣ Fetch both tables
+                    program_data = session.query(
+                        ProgramSettings.ProgramId,
+                        ProgramSettings.ProgramName
+                    ).all()
+
+                    probe_data = session.query(
+                        ProbeBasedSettings.ProgramId,
+                        ProbeBasedSettings.ProgramName
+                    ).distinct().all()
+
+                    # 2️⃣ Use dict for merge
+                    program_dict = {}
+
+                    # ✅ Step A: Insert all ProgramSettings (base)
+                    for pid, pname in program_data:
+                        program_dict[pid] = pname
+
+                    # ✅ Step B: Override OR Add from ProbeBasedSettings
+                    for pid, pname in probe_data:
+                        if pname:  
+                            # 🔥 If exists → overwrite
+                            # 🔥 If not → add new
+                            program_dict[pid] = pname
+
+                    # 3️⃣ Return sorted list (optional but good)
+                    return sorted(program_dict.items(), key=lambda x: x[0])
+
+                except Exception as e:
+                    print("Error fetching program list:", e)
+                    return []
+        except Exception as e:
+            print(f"Error in get_program_list: {e}")
+            return []
+    
+        
+        
+    def setup_program_table(self):
+        """
+        Configure table view with columns
+        """
+        try:         
+            self.table_programList = self.ui.ProgramList_TableView   
+            # Create and set model for table view
+            self.model = QStandardItemModel()
+            self.model.setHorizontalHeaderLabels(["Program ID", "Program Name"])
+            self.table_programList.setModel(self.model)
+            self.table_programList.verticalHeader().setStyleSheet(
+                "QHeaderView::section { background-color: #2b2b2b; color: white; border: 1px solid #888888; }"
+            )
+            
+            # Set column widths
+            # Set vertical header width
+            # table.verticalHeader().setWidth(90)
+            self.table_programList.setColumnWidth(0, 150)
+            self.table_programList.setColumnWidth(1, 570)
+            # self.table_programList.setColumnWidth(3, 230)
+            self.table_programList.setStyleSheet(u"QTableView::item { border: 2px solid #888888; }\n"
+"QHeaderView::section { border: 2px solid #888888; }")
+            
+            # self.table_programList.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+#             self.table_programList.verticalScrollBar().setStyleSheet("""
+# QScrollBar:vertical {
+#     background: black;
+#     border: 1px solid #888888;
+#     width: 20px;
+#     min-width: 20px;
+#     max-width: 20px;
+# }
+
+# """)
+            self.table_programList.verticalScrollBar().setStyleSheet("""
+QScrollBar:vertical {
+    background: black;
+    border: 1px solid #888888;
+    width: 40px;
+}
+""")
+            # Disable column resizing
+            self.table_programList.horizontalHeader().setStretchLastSection(False)
+            self.table_programList.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+            # Set row height
+            self.table_programList.verticalHeader().setDefaultSectionSize(50)
+            self.table_programList.verticalHeader().setVisible(False)
+            # Select entire row
+            self.table_programList.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+            self.table_programList.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            
+            self.table_programList.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)  # already you have
+            # self.table_programList.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)   # ❌ disable selection
+            self.table_programList.setFocusPolicy(QtCore.Qt.NoFocus)   # ❌ no focus highlight
+
+            # Set header font size and bold
+            header_font = self.table_programList.horizontalHeader().font()
+            header_font.setPointSize(13)
+            header_font.setBold(True)
+            self.table_programList.horizontalHeader().setFont(header_font)
+            
+            # Set header background color to grey and font color to white
+            self.table_programList.horizontalHeader().setStyleSheet(
+                "QHeaderView::section { background-color: #2b2b2b; color: white; border: 1px solid #888888; min-height:50px; }"
+            )
+            
+            # Set font size
+            font = self.table_programList.font()
+            font.setPointSize(13)
+            self.table_programList.setFont(font)
+            self.row_index = self.table_programList.currentIndex().row()
+            self.table_programList.clicked.connect(self.on_program_selected)
+            self.table_programList.selectionModel().selectionChanged.connect(self.on_selection_changed)
+            # print("self.table_programList setup completed")
+        except Exception as e:
+            print(f"Error setting up table: {e}")
+    def on_selection_changed(self, selected, deselected):
+        try:
+            indexes = self.table_programList.selectionModel().selectedRows()
+
+            if indexes:
+                row = indexes[0].row()
+                self.selected_program_id = self.model.item(row, 0).text()
+            else:
+                self.selected_program_id = None     
+        except Exception as e:
+            print(f"error on_selection_changed -> {e}")          
+    def on_program_selected(self, index):
+        try:
+            row = index.row()
+
+            if self.last_selected_row == row:
+                # Deselect
+                self.table_programList.clearSelection()
+                self.table_programList.setCurrentIndex(QtCore.QModelIndex())
+                self.last_selected_row = -1
+                self.selected_program_id = None  
+            else:
+                self.last_selected_row = row
+                program_id = self.model.item(row, 0).text()
+                program_name = self.model.item(row, 1).text()
+
+                self.selected_program_id = program_id
+        except Exception as e:
+            print(f"Error in on_program_selected -> {e}")
+        
+    def on_ProgramId_delete_clicked(self):
+        try:
+            if hasattr(self, "selected_program_id"):
+                program_id = self.selected_program_id
+                if program_id is not None:
+                    confirm_msg = CustomMessageBox(
+                        f"Are you sure you want to delete Program ID {program_id}?",
+                        "info",
+                        parent=self.ui
+                    )
+                    confirm_msg.exec_()
+                    if confirm_msg.result:  # User confirmed deletion
+                        self.program_deleted.emit(int(program_id))  # Emit signal with deleted program ID
+                        self.update_ui_after_programSettings_saved()
+                else:
+                    msg = CustomMessageBox(
+                        "No program selected for deletion.",
+                        "error",
+                        parent=self.ui
+                    )
+                    msg.exec_()
+        except Exception as e:
+            print(f"Error on_ProgramId_delete_clicked -> {e}")    
+    def on_ProgramId_load_clicked(self):
+        try:
+            if hasattr(self, "selected_program_id"):
+                program_id = self.selected_program_id
+                if program_id is not None:
+                    confirm_msg = CustomMessageBox(
+                        f"Are you sure you want to load Program ID {program_id}?",
+                        "info",
+                        parent=self.ui
+                    )
+                    confirm_msg.exec_()
+                    if confirm_msg.result:  # User confirmed deletion
+                        self.load_program.emit(int(program_id))
+                        self.update_ui_after_programSettings_saved()
+                        # 
+                else:
+                    msg = CustomMessageBox(
+                        "No program selected for load.",
+                        "error",
+                        parent=self.ui
+                    )
+                    msg.exec_()
+        except Exception as e:
+            print(f"Error on_ProgramId_delete_clicked -> {e}") 
+    def load_program_table(self):
+        try:
+            data = self.get_program_list()
+
+            self.model.setRowCount(0)
+
+            for pid, pname in data:
+                id_item = QStandardItem(str(pid))
+                name_item = QStandardItem(pname if pname else "")
+
+                # ✅ Center align text
+                id_item.setTextAlignment(Qt.AlignCenter)
+                name_item.setTextAlignment(Qt.AlignCenter)
+
+                self.model.appendRow([id_item, name_item])
+            count = len(data)
+            self.ui.status_manager.set_fixed_message(
+                29,
+                f"{count} Programs Loaded successfully",
+                msg_type="success"
+            )
+        except Exception as e:
+            print(f"Error in load_program_table -> {e}")

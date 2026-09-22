@@ -1,0 +1,78 @@
+On docker-compose.yml add below lines:
+
+services:
+  weston:
+    image: torizon/weston:$CT_TAG_WESTON
+    restart: always
+    privileged: true
+    network_mode: host
+    ipc: host
+
+    environment:
+      - ENABLE_RDP=1
+
+    volumes:
+      - /tmp:/tmp
+      - /dev:/dev
+      - /run/udev:/run/udev
+      - /home/torizon/custom:/etc/xdg/weston-dev/
+      - /home/torizon/custom/Loading.png:/home/torizon/custom/Loading.png
+
+    cap_add:
+      - CAP_SYS_TTY_CONFIG
+
+    device_cgroup_rules:
+      - 'c 4:* rmw'
+      - 'c 13:* rmw'
+      - 'c 226:* rmw'
+      - 'c 10:223 rmw'
+
+
+1)docker ps
+
+2)check torizoncontainer running and copy container id or container name 
+
+torizon@colibri-imx7-emmc-06673340:~$ docker exec -it c_id or name bash
+root@colibri-imx7-emmc-06673340:/home/torizon# cat /etc/xdg/weston/weston.ini
+[core]
+idle-time=0
+require-input=false
+xwayland=true
+modules=screen-share.so
+# uncomment line below to use kiosk shell
+#shell=kiosk-shell.so
+
+[shell]
+background-image=/home/torizon/custom/Loading.png
+background-color=0x00000000
+panel-position=none
+locking=false
+allow-zap=false
+num-workspaces=1
+
+[keyboard]
+vt-switching=false
+
+# uncomment the [output] line below if you set any output configuration
+#[output]
+# you must uncomment the "name” line and provide the name of the output interface being customized, otherwise, changes will not apply
+#name=HDMI-A-1
+# uncomment line below to configure screen rotation/flipping
+#transform=rotate-90
+# uncomment line below to redirect the output; supported by kiosk shell
+#app-ids=my-app-id
+# uncomment line below to turn off the output
+#mode=off
+# uncomment line below to set an output resolution. Run for example 'cat /sys/class/drm/card1-HDMI-A-1/modes' to list the available modes.
+#mode=1680x1050@60
+# or use the more detailed (mode=dotclock hdisp hsyncstart hsyncend htotal vdisp vsyncstart vsyncend vtotal hflag vflag)
+#mode=146.25  1680 1784 1960 2240  1050 1053 1059 1089 -hsync +vsync
+# uncomment line below to make this output a clone of another
+#same-as=HDMI-A-2
+
+#For multi-display support and other configurations, please read the article: https://developer.toradex.com/torizon/provided-containers/working-with-weston-on-torizoncore/
+[screen-share]
+command=/usr/bin/weston --no-config --backend=rdp-backend.so --shell=fullscreen-shell.so --rdp-tls-key=/var/volatile/tls.key --rdp-tls-cert=/var/volatile/tls.crt --no-clients-resize --force-no-compression
+start-on-startup=true
+root@colibri-imx7-emmc-06673340:/home/torizon#exit
+

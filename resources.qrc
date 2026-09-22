@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/">
+        <file>clock.png</file>
+        <file>userman12.png</file>
+        <file>autooffset.png</file>
+        <file>indicator.png</file>
+        <file>settings.png</file>
+        <file>Buzzer.png</file>
+        <file>Report.png</file>
+        <file>help130.png</file>
+    </qresource>
+</RCC>
