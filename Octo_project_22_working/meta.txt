@@ -1,0 +1,21 @@
+1) src_201_1
+- Added READING_FREEZE IO setting control.
+When READING_FREEZE = 1:
+- Live value runs until status is stable for AutoSave_Duration.
+- Final converted value/status freezes.
+- Autosave and relay run once only.
+- Save button and footswitch save the frozen reading once only.
+- Micron/raw fluctuations do nothing.
+- Autosense clears the frozen cycle and allows the next part.
+When READING_FREEZE = 0:
+- Original live-value behavior remains.
+- Value changes can update status, autosave, relay, and manual save normally.
+Applied the same logic for normal master and No Master/formula dimensions.
+
+2)src_201_2
+
+- added ui toggle button Reading Freeze on IOSettings. if that enable
+then only above functions(src_201_1)  will works otherwise normal save,autosave,relay working.
+- focus for lineedit for relaytime,cycltetime ,timetomaster set time set focus as clickedfocus.
+
+ 
